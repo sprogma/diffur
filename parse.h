@@ -8,9 +8,13 @@
 typedef struct parse_result_t (*parser_fn_t)(const char *code, struct parser_error_table_t *error_record);
 
 struct node_t *new_node();
+struct node_t *new_node_ex(enum node_type_t type,
+                           char *start,
+                           char *end);
 void free_node(struct node_t *node);
 void add_child(struct node_t *node, struct node_t *child);
 struct node_t *remove_child(struct node_t *node, size_t child_id);
+struct node_t * deep_copy(struct node_t *node);
 
 struct parse_result_t parse_many_or_one(parser_fn_t parse_child, parser_fn_t delim, const char *input, struct parser_error_table_t *error_record);
 struct parse_result_t parse_many(parser_fn_t parse_child, parser_fn_t delim, const char *input, struct parser_error_table_t *error_record);

@@ -1,208 +1,133 @@
 #include "parser_api.h"
 #include "parser_errors.h"
+#include "export.h"
+#include "astworker.h"
 #include "ctype.h"
+#include "string.h"
 #include "stdio.h"
 
 
-void print_node(struct node_t *node, int indent)
-{
-    printf("%*s", indent, "");
-    printf("Node type %d : [%.*s]\n", (int)node->type, (int)(node->end - node->start), node->start);
-    for (size_t i = 0; i < node->childs_length; ++i)
-    {
-        print_node(node->childs[i], indent + 4);
-    }
-}
-
-
-struct node_t *normalize_tree(struct node_t *node)
-{
-    if (node->type == NODE_TYPE_BRACES)
-    {
-        return normalize_tree(node->childs[0]);
-    }
-    if (node->type == NODE_TYPE_ADDSUB || 
-        node->type == NODE_TYPE_MULDIV || 
-        node->type == NODE_TYPE_POW)
-    {
-        if (node->childs_length > 3)
-        {
-            /* create subnode */
-            struct node_t *newnode = new_node();
-            newnode->type = node->type;
-            newnode->start = node->start;
-            newnode->end = node->end;
-
-            
-            /* remove 2 last nodes */
-            if (node->type == NODE_TYPE_ADDSUB ||
-                node->type == NODE_TYPE_MULDIV)
-            {
-                node->end = node->childs[node->childs_length - 2]->start;
-                
-                /* left to right nodes */
-                struct node_t *y = remove_child(node, node->childs_length - 1);
-                struct node_t *x = remove_child(node, node->childs_length - 1);
-
-                add_child(newnode, normalize_tree(node));
-                add_child(newnode, normalize_tree(x));
-                add_child(newnode, normalize_tree(y));
-            }
-            else
-            {
-                node->start = node->childs[2]->start;
-                
-                /* right to left nodes */
-                struct node_t *x = remove_child(node, 0);
-                struct node_t *y = remove_child(node, 0);
-
-                add_child(newnode, normalize_tree(x));
-                add_child(newnode, normalize_tree(y));
-                add_child(newnode, normalize_tree(node));
-            }
-
-            return newnode;
-        }
-    }
-    for (size_t i = 0; i < node->childs_length; ++i)
-    {
-        node->childs[i] = normalize_tree(node->childs[i]);
-    }
-    return node;
-}
-
-
-char *print_tree(char *s, struct node_t *node)
+struct node_t *derivative(struct node_t *node)
 {
     switch (node->type)
     {
+        case NODE_TYPE_OP_SUB:
+        case NODE_TYPE_OP_ADD:
+        case NODE_TYPE_OP_MUL:
+        case NODE_TYPE_BRACES:
+        case NODE_TYPE_OP_DIV:
+        case NODE_TYPE_OP_POW:
+        case NODE_TYPE_OP_COMMA:
         case NODE_TYPE_NULL:
-            { 
-                printf("Error: print NULL node\n");
-                return s;
+            {
+                printf("Error: derivative of NULL/technical node\n");
+                struct node_t *res = new_node();
+                res->type = NODE_TYPE_NULL;
+                res->end = res->start = strdup("");
+                return res;
             }
             break;
         case NODE_TYPE_ADDSUB:
             {
-                for (size_t i = 0; i < node->childs_length; i++)
-                {
-                    if (priority[node->childs[i]->type] < priority[node->type])
-                    {
-                        s += sprintf(s, "(");
-                    }
-                    s = print_tree(s, node->childs[i]);
-                    if (priority[node->childs[i]->type] < priority[node->type])
-                    {
-                        s += sprintf(s, ")");
-                    }
-                }
-            }
-            break;
-        case NODE_TYPE_OP_ADD:
-            { 
-            
-                s += sprintf(s, "+");
-            }
-            break;
-        case NODE_TYPE_OP_SUB:
-            { 
-                s += sprintf(s, "-");
+                struct node_t *res = new_node();
+                res->type = NODE_TYPE_ADDSUB;
+                res->start = node->start;
+                res->end = node->end;
+
+                add_child(res, node->childs[0]);
+                add_child(res, node->childs[1]);
+                add_child(res, node->childs[2]);
+                
+                res->childs[0] = derivative(res->childs[0]);
+                res->childs[2] = derivative(res->childs[2]);
+                
+                return res;
             }
             break;
         case NODE_TYPE_MULDIV:
             { 
-                for (size_t i = 0; i < node->childs_length; i++)
+                if (node->childs[1]->type == NODE_TYPE_OP_MUL)
                 {
-                    if (priority[node->childs[i]->type] < priority[node->type])
-                    {
-                        s += sprintf(s, "(");
-                    }
-                    s = print_tree(s, node->childs[i]);
-                    if (priority[node->childs[i]->type] < priority[node->type])
-                    {
-                        s += sprintf(s, ")");
-                    }
+                    struct node_t *mul1 = new_node_ex(NODE_TYPE_MULDIV, "", "");
+                    struct node_t *mul1s = new_node_ex(NODE_TYPE_OP_MUL, "", "");
+                    struct node_t *mul2 = new_node_ex(NODE_TYPE_MULDIV, "", "");
+                    struct node_t *mul2s = new_node_ex(NODE_TYPE_OP_MUL, "", "");
+                    struct node_t *add1 = new_node_ex(NODE_TYPE_ADDSUB, "", "");
+                    struct node_t *add1s = new_node_ex(NODE_TYPE_OP_ADD, "", "");
+
+                    add_child(mul1, derivative(node->childs[0]));
+                    add_child(mul1, mul1s);
+                    add_child(mul1, node->childs[2]);
+
+                    add_child(mul2, node->childs[0]);
+                    add_child(mul2, mul2s);
+                    add_child(mul2, derivative(node->childs[2]));
+
+                    add_child(add1, mul1);
+                    add_child(add1, add1s);
+                    add_child(add1, mul2);
+                    
+                    return add1;
                 }
-            }
-            break;
-        case NODE_TYPE_OP_MUL:
-            { 
-                s += sprintf(s, "*");
-            }
-            break;
-        case NODE_TYPE_OP_DIV:
-            { 
-                s += sprintf(s, "/");
-            }
-            break;
-        case NODE_TYPE_BRACES:
-            { 
-                s += sprintf(s, "(");
-                s = print_tree(s, node->childs[0]);
-                s += sprintf(s, ")");
+                else
+                {
+                    printf("NOT SUPPORTED\n");
+                    exit(1);
+                }
             }
             break;
         case NODE_TYPE_FLOAT:
             { 
-                s += sprintf(s, "%.*s", (int)(node->end - node->start), node->start);
+                struct node_t *res = new_node();
+                res->type = NODE_TYPE_FLOAT;
+                res->end = res->start = strdup("0");
+                return res;
             }
             break;
         case NODE_TYPE_IDENTIFER:
             { 
-                s += sprintf(s, "%.*s", (int)(node->end - node->start), node->start);
+                if (strncmp(node->start, "x", node->end - node->start) == 0)
+                { 
+                    struct node_t *res = new_node();
+                    res->type = NODE_TYPE_FLOAT;
+                    res->end = res->start = strdup("1");
+                    return res;
+                }
+                struct node_t *res = new_node();
+                res->type = NODE_TYPE_FLOAT;
+                res->end = res->start = strdup("0");
+                return res;
             }
             break;
         case NODE_TYPE_POW:
-            { 
-                for (size_t i = 0; i < node->childs_length; i++)
-                {
-                    if (priority[node->childs[i]->type] < priority[node->type])
-                    {
-                        s += sprintf(s, "(");
-                    }
-                    s = print_tree(s, node->childs[i]);
-                    if (priority[node->childs[i]->type] < priority[node->type])
-                    {
-                        s += sprintf(s, ")");
-                    }
-                }
-            }
-            break;
-        case NODE_TYPE_OP_POW:
-            { 
-                s += sprintf(s, "^");
-            }
-            break;
-        case NODE_TYPE_OP_COMMA:
-            { 
-                s += sprintf(s, ",");
+            {
+                printf("NOT SUPPORTED\n");
+                exit(1);
             }
             break;
         case NODE_TYPE_FN_ARGS:
-            { 
-                for (size_t i = 0; i < node->childs_length; i++)
-                {
-                    s = print_tree(s, node->childs[i]);
-                }
+            {
+                printf("NOT SUPPORTED\n");
+                exit(1);
             }
             break;
         case NODE_TYPE_FN_CALL:
             { 
-                s = print_tree(s, node->childs[0]);
-                s += sprintf(s, "(");
-                s = print_tree(s, node->childs[1]);
-                s += sprintf(s, ")");
+                printf("NOT SUPPORTED\n");
+                exit(1);
             }
             break;
         case NODE_TYPE_OP_PREFIX:
             { 
-                s = print_tree(s, node->childs[0]);
-                s = print_tree(s, node->childs[1]);
+                printf("NOT SUPPORTED\n");
+                exit(1);
             }
             break;
     }
-    return s;
+    printf("ERROR!\n");
+    return NULL;
 }
+
 
 
 int main()
@@ -224,22 +149,65 @@ int main()
         return 1;
     }
 
+    struct node_t *tree = result.node;
+
+    char *buf = malloc(1024 * 64), *t = NULL;
+    
+
     printf("Parsing completed.\n");
-
-    print_node(result.node, 0);
-
-    /* remove all braces nodes */
-    
-    struct node_t *tree = normalize_tree(result.node);
-    
-    printf("Simplified tree:\n");
-    print_node(tree, 0);
-
-    printf("Expr:\n");
-    char *buf = malloc(1024 * 64);
-    char *t = print_tree(buf, tree);
+    t = export_ast(buf, tree);
     *t = 0;
     printf("%s\n", buf);
+
+
+    tree = normalize_tree(tree);
+    
+
+    printf("Normalized tree:\n");
+    t = export_ast(buf, tree);
+    *t = 0;
+    printf("%s\n", buf);
+
+
+    tree = optimize_tree(tree);
+    
+
+    printf("Optimized tree:\n");
+    t = export_ast(buf, tree);
+    *t = 0;
+    printf("%s\n", buf);
+
+
+    printf("Exported:\n");
+    t = export_basic(buf, tree);
+    *t = 0;
+    printf("%s\n", buf);
+
+
+    tree = derivative(tree);
+    
+
+    printf("Derivative tree:\n");
+    t = export_ast(buf, tree);
+    *t = 0;
+    printf("%s\n", buf);
+
+
+    tree = optimize_tree(tree);
+    
+
+    printf("Optimized derivative tree:\n");
+    t = export_ast(buf, tree);
+    *t = 0;
+    printf("%s\n", buf);
+
+
+    printf("Exported:\n");
+    t = export_basic(buf, tree);
+    *t = 0;
+    printf("%s\n", buf);
+
     free(buf);
+    
     return 0;
 }

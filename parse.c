@@ -15,6 +15,21 @@ struct node_t *new_node()
     return node;
 }
 
+struct node_t *new_node_ex(enum node_type_t type,
+                           char *start,
+                           char *end)
+{
+    struct node_t *node = calloc(1, sizeof(*node));
+
+    node->type = type;
+    node->start = start;
+    node->end = end;
+
+    if (node == NULL) { puts("No more memory"); exit(2); }
+    
+    return node;
+}
+
 
 void free_node(struct node_t *node)
 {
@@ -51,6 +66,20 @@ struct node_t * remove_child(struct node_t *node, size_t child_id)
     struct node_t *res = node->childs[child_id];
     memmove(node->childs + child_id, node->childs + child_id + 1, sizeof(*node->childs) * (node->childs_length - child_id - 1));
     node->childs_length--;
+    return res;
+}
+
+
+struct node_t * deep_copy(struct node_t *node)
+{
+    struct node_t *res = new_node();
+    res->type = node->type;
+    res->start = node->start;
+    res->end = node->end;
+    for (size_t i = 0; i < node->childs_length; ++i)
+    {
+        add_child(res, deep_copy(node->childs[i]));
+    }
     return res;
 }
 
