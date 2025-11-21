@@ -46,6 +46,15 @@ void add_child(struct node_t *node, struct node_t *new_child)
 }
 
 
+struct node_t * remove_child(struct node_t *node, size_t child_id)
+{
+    struct node_t *res = node->childs[child_id];
+    memmove(node->childs + child_id, node->childs + child_id + 1, sizeof(*node->childs) * (node->childs_length - child_id - 1));
+    node->childs_length--;
+    return res;
+}
+
+
 
 struct parse_result_t parse_many(
     parser_fn_t parse_child,

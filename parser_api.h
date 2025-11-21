@@ -29,12 +29,53 @@ enum node_type_t
     NODE_TYPE_MULDIV,
     NODE_TYPE_OP_MUL,
     NODE_TYPE_OP_DIV,
+    NODE_TYPE_POW,
+    NODE_TYPE_OP_POW,
     NODE_TYPE_BRACES,
     NODE_TYPE_FLOAT,
     NODE_TYPE_IDENTIFER,
     NODE_TYPE_OP_COMMA,
     NODE_TYPE_FN_ARGS,
     NODE_TYPE_FN_CALL,
+    NODE_TYPE_OP_PREFIX,
+};
+
+
+#define P_INF +9999
+
+const static int priority[] = {
+    // NODE_TYPE_NULL,
+    P_INF,
+    // NODE_TYPE_ADDSUB,
+    +100,
+    // NODE_TYPE_OP_ADD,
+    P_INF,
+    // NODE_TYPE_OP_SUB,
+    P_INF,
+    // NODE_TYPE_MULDIV,
+    +200,
+    // NODE_TYPE_OP_MUL,
+    P_INF,
+    // NODE_TYPE_OP_DIV,
+    P_INF,
+    // NODE_TYPE_POW,
+    +300,
+    // NODE_TYPE_OP_POW,
+    P_INF,
+    // NODE_TYPE_BRACES,
+    P_INF,
+    // NODE_TYPE_FLOAT,
+    P_INF,
+    // NODE_TYPE_IDENTIFER,
+    P_INF,
+    // NODE_TYPE_OP_COMMA,
+    P_INF,
+    // NODE_TYPE_FN_ARGS,
+    P_INF,
+    // NODE_TYPE_FN_CALL,
+    P_INF,
+    // NODE_TYPE_OP_PREFIX,
+    +150,
 };
 
 

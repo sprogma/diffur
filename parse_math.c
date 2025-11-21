@@ -17,6 +17,9 @@ struct parse_result_t parse_addsub(const char *code, struct parser_error_table_t
 struct parse_result_t parse_muldiv_delim(const char *code, struct parser_error_table_t *error_record);
 struct parse_result_t parse_muldiv_child(const char *code, struct parser_error_table_t *error_record);
 struct parse_result_t parse_muldiv(const char *code, struct parser_error_table_t *error_record);
+struct parse_result_t parse_pow_delim(const char *code, struct parser_error_table_t *error_record);
+struct parse_result_t parse_pow_child(const char *code, struct parser_error_table_t *error_record);
+struct parse_result_t parse_pow(const char *code, struct parser_error_table_t *error_record);
 struct parse_result_t parse_braced_expression(const char *code, struct parser_error_table_t *error_record);
 struct parse_result_t parse_fncall_delim(const char *code, struct parser_error_table_t *error_record);
 struct parse_result_t parse_function_call(const char *code, struct parser_error_table_t *error_record);
@@ -115,9 +118,88 @@ struct parse_result_t parse_identifer(const char *code, struct parser_error_tabl
 
 struct parse_result_t parse_scalar(const char *code, struct parser_error_table_t *error_record)
 {
-    return parse_xor(code, error_record, 2,
-                     parse_identifer,
-                     parse_float);
+    /* parse prefix + or - */
+    struct node_t *node = NULL;
+    
+    while (isskipchar(*code)) { code++; }
+    
+    if (*code == '+')
+    {
+        node = new_node();
+        node->type = NODE_TYPE_OP_PREFIX;
+        node->start = code;
+        
+        struct node_t *op = new_node();
+        op->type = NODE_TYPE_OP_ADD;
+        op->start = code;
+        op->end = code + 1;
+
+        add_child(node, op);
+        
+        code++;
+    }
+    else if (*code == '-')
+    {
+        node = new_node();
+        node->type = NODE_TYPE_OP_PREFIX;
+        node->start = code;
+        
+        struct node_t *op = new_node();
+        op->type = NODE_TYPE_OP_SUB;
+        op->start = code;
+        op->end = code + 1;
+
+        add_child(node, op);
+        
+        code++;
+    }
+
+    struct parse_result_t result;
+    if (node)
+    {
+        result = parse_first(code, error_record, 1,
+                                 parse_scalar);
+
+                                 
+        if (result.rest == NULL)
+        {
+            free_node(node);
+            
+            #ifdef SEE_VERBOSE_ERRORS
+            return (struct parse_result_t){NULL, NULL, result.table_length, result.table_alloc, result.table};
+            #else
+            return (struct parse_result_t){NULL, NULL};
+            #endif
+        }
+    }
+    else
+    {
+        result = parse_first(code, error_record, 5,
+                                 parse_pow,
+                                 parse_braced_expression,
+                                 parse_function_call,
+                                 parse_identifer,
+                                 parse_float);
+    }
+
+
+    if (node)
+    {
+        node->end = result.rest;
+        add_child(node, result.node);
+        
+        update_max_parsed(node, error_record);
+
+        #ifdef SEE_VERBOSE_ERRORS
+        return (struct parse_result_t){node->end, node, 0, 0, NULL};
+        #else
+        return (struct parse_result_t){node->end, node};
+        #endif
+    }
+    else
+    {
+        return result;
+    }
 }
 
 
@@ -167,10 +249,8 @@ struct parse_result_t parse_addsub_delim(const char *code, struct parser_error_t
 
 struct parse_result_t parse_addsub_child(const char *code, struct parser_error_table_t *error_record)
 {
-    return parse_first(code, error_record, 4, 
+    return parse_first(code, error_record, 2, 
                      parse_muldiv, 
-                     parse_braced_expression, 
-                     parse_function_call, 
                      parse_scalar);
 }
 
@@ -249,9 +329,7 @@ struct parse_result_t parse_muldiv_delim(const char *code, struct parser_error_t
 
 struct parse_result_t parse_muldiv_child(const char *code, struct parser_error_table_t *error_record)
 {
-    return parse_first(code, error_record, 3, 
-                         parse_braced_expression, 
-                         parse_function_call, 
+    return parse_first(code, error_record, 1, 
                          parse_scalar);
 }
 
@@ -272,6 +350,73 @@ struct parse_result_t parse_muldiv(const char *code, struct parser_error_table_t
     }
     
     result.node->type = NODE_TYPE_MULDIV;
+    result.node->start = code;
+    result.node->end = result.rest;
+
+    update_max_parsed(result.node, error_record);
+
+    #ifdef SEE_VERBOSE_ERRORS
+    return (struct parse_result_t){result.rest, result.node, result.table_length, result.table_alloc, result.table};
+    #else
+    return (struct parse_result_t){result.rest, result.node};
+    #endif
+}
+
+
+struct parse_result_t parse_pow_delim(const char *code, struct parser_error_table_t *error_record)
+{
+    while (isskipchar(*code)) { code++; }
+    if (*code == '^')
+    {
+        struct node_t *node = new_node();
+        node->type = NODE_TYPE_OP_POW;
+        node->start = code;
+        node->end = code + 1;
+
+        update_max_parsed(node, error_record);
+
+        #ifdef SEE_VERBOSE_ERRORS
+        return (struct parse_result_t){code + 1, node, 0, 0, NULL};
+        #else
+        return (struct parse_result_t){code + 1, node};
+        #endif
+    }
+    #ifdef SEE_VERBOSE_ERRORS
+    struct parser_error_record_t *records = calloc(1, sizeof(*records));
+    records[0].position = code;
+    records[0].prediction = strdup("^");
+    return (struct parse_result_t){NULL, NULL, 1, 1, records};
+    #else
+    return (struct parse_result_t){NULL, NULL};
+    #endif
+}
+
+struct parse_result_t parse_pow_child(const char *code, struct parser_error_table_t *error_record)
+{
+    return parse_first(code, error_record, 4, 
+                            parse_braced_expression,
+                            parse_function_call,
+                            parse_identifer,
+                            parse_float);
+}
+
+struct parse_result_t parse_pow(const char *code, struct parser_error_table_t *error_record)
+{
+    struct parse_result_t result = parse_many(&parse_pow_child,
+                                              &parse_pow_delim,
+                                              code,
+                                              error_record);
+    if (result.rest == NULL)
+    {
+        #ifdef SEE_VERBOSE_ERRORS
+        // TODO:
+        return (struct parse_result_t){NULL, NULL, result.table_length, result.table_alloc, result.table};
+        #else
+        return (struct parse_result_t){NULL, NULL};
+        #endif
+    }
+    
+    result.node->type = NODE_TYPE_POW;
     result.node->start = code;
     result.node->end = result.rest;
 
@@ -425,9 +570,9 @@ struct parse_result_t parse_function_call(const char *code, struct parser_error_
 
 
     struct parse_result_t result = parse_many_or_one(&parse_expression,
-                                              &parse_fncall_delim,
-                                              code,
-                                              error_record);
+                                                     &parse_fncall_delim,
+                                                     code,
+                                                     error_record);
     result.node->start = code;
     
     #ifdef SEE_VERBOSE_ERRORS
@@ -436,6 +581,7 @@ struct parse_result_t parse_function_call(const char *code, struct parser_error_
     
     if (result.rest == NULL)
     {
+        printf("ERROR!\n");
         free_node(name.node);
         
         #ifdef SEE_VERBOSE_ERRORS
@@ -486,11 +632,9 @@ struct parse_result_t parse_function_call(const char *code, struct parser_error_
 
 struct parse_result_t parse_expression(const char *code, struct parser_error_table_t *error_record)
 {
-    return parse_first(code, error_record, 5, 
+    return parse_first(code, error_record, 3, 
                              parse_addsub, 
                              parse_muldiv, 
-                             parse_function_call, 
-                             parse_braced_expression, 
                              parse_scalar);
 }
 

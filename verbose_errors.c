@@ -37,6 +37,7 @@ int remove_duplicates_records(struct parse_result_t *result)
         }
         result->table_length = id;
     }
+    return 0;
 }
 
 int update_all_records(struct parse_result_t *result, const char *string)

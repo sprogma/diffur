@@ -62,6 +62,6 @@ double get_error_record_score(struct parser_error_record_t *record, struct parse
 
     free(result_code);
     
-    return 0.0 - abs(error->max_parsed_position - record->position) - distance;
+    return 0.0 - llabs(error->max_parsed_position - record->position) - distance;
 }
 #endif
