@@ -145,7 +145,7 @@ static struct node_t *optimize_shuffle_ops(const struct node_t *node, double tim
             return res_node;
         }
         // a c b
-        if (node->childs[2]->type == node->type && rand() % 1000 > 750)
+        if (node->childs[2]->type == node->type && rand() % 1000 > 700)
         {
             struct node_t *res_node = soft_copy(node);
             struct node_t *leftnode = soft_copy(node->childs[2]);
@@ -182,7 +182,7 @@ static struct node_t *optimize_shuffle_ops(const struct node_t *node, double tim
             return res_node;
         }
         // a +- (b +- c) -> (a +- b) +-/-+ c
-        if (node->childs[2]->type == node->type && rand() % 1000 > 650)
+        if (node->childs[2]->type == node->type && rand() % 1000 > 550)
         {
             struct node_t *res_node = soft_copy(node);
             struct node_t *leftnode = soft_copy(node->childs[2]);
@@ -221,7 +221,7 @@ static struct node_t *optimize_shuffle_ops(const struct node_t *node, double tim
             return res_node;
         }
         // (a +- b) +- c -> a +- (b +- c)
-        if (node->childs[0]->type == node->type && rand() % 1000 > 500)
+        if (node->childs[0]->type == node->type && rand() % 1000 > 300)
         {
             struct node_t *res_node = soft_copy(node);
             struct node_t *rightnode = soft_copy(node->childs[0]);
@@ -256,6 +256,13 @@ static struct node_t *optimize_shuffle_ops(const struct node_t *node, double tim
                     rightnodeop->type = NODE_TYPE_OP_MUL;
                 }
             }
+            return res_node;
+        }
+        if ((node->childs[1]->type == NODE_TYPE_OP_MUL || node->childs[1]->type == NODE_TYPE_OP_ADD) && rand() % 1000 > 450)
+        {
+            struct node_t *res_node = soft_copy(node);
+            res_node->childs[0] = node->childs[2];
+            res_node->childs[2] = node->childs[0];
             return res_node;
         }
     }
@@ -482,18 +489,42 @@ struct node_t *optimize_simple_sums(const struct node_t *node, double time)
             node->childs[2]->type == NODE_TYPE_MULDIV && node->childs[2]->childs[1]->type == NODE_TYPE_OP_MUL &&
             rand() % 1000 < time * 1000)
         {
-            struct node_t
+            struct node_t *same = NULL;
+            struct node_t *node_acf = NULL, *node_bcf = NULL;
             if (is_same(node->childs[0]->childs[0], node->childs[2]->childs[0]))
+            {
+                same = node->childs[0]->childs[0];
+                node_acf = node->childs[0]->childs[2];
+                node_bcf = node->childs[2]->childs[2];
+            }
+            else if (is_same(node->childs[0]->childs[2], node->childs[2]->childs[0]))
+            {
+                same = node->childs[0]->childs[2];
+                node_acf = node->childs[0]->childs[0];
+                node_bcf = node->childs[2]->childs[2];
+            }
+            else if (is_same(node->childs[0]->childs[0], node->childs[2]->childs[2]))
+            {
+                same = node->childs[0]->childs[0];
+                node_acf = node->childs[0]->childs[2];
+                node_bcf = node->childs[2]->childs[0];
+            }
+            else if (is_same(node->childs[0]->childs[2], node->childs[2]->childs[2]))
+            {
+                same = node->childs[0]->childs[2];
+                node_acf = node->childs[0]->childs[0];
+                node_bcf = node->childs[2]->childs[0];
+            }
+            if (same && node_acf && node_bcf)
             {
                 struct node_t *res_node = new_node_ex(NODE_TYPE_MULDIV, NULL, NULL);
                 struct node_t *addnode = new_node_ex(NODE_TYPE_ADDSUB, NULL, NULL);
-                struct node_t *addop = new_node_ex(NODE_TYPE_OP_ADD, NULL, NULL);
 
-                add_child(addnode, node->childs[0]->childs[2]);
-                add_child(addnode, addop);
-                add_child(addnode, node->childs[2]->childs[2]);
+                add_child(addnode, node_acf);
+                add_child(addnode, node->childs[1]);
+                add_child(addnode, node_bcf);
 
-                add_child(res_node, node->childs[0]->childs[0]);
+                add_child(res_node, same);
                 add_child(res_node, node->childs[0]->childs[1]);
                 add_child(res_node, addnode);
             
@@ -505,6 +536,7 @@ struct node_t *optimize_simple_sums(const struct node_t *node, double time)
         {
             struct node_t *mul = NULL;
             struct node_t *other = NULL;
+            int swap = 0;
             if (node->childs[0]->type == NODE_TYPE_MULDIV && node->childs[0]->childs[1]->type == NODE_TYPE_OP_MUL)
             {
                 mul = node->childs[0];
@@ -514,6 +546,7 @@ struct node_t *optimize_simple_sums(const struct node_t *node, double time)
             {
                 mul = node->childs[2];
                 other = node->childs[0];
+                swap = 1;
             }
             struct node_t *same = NULL, *coeff = NULL;
 
@@ -527,7 +560,8 @@ struct node_t *optimize_simple_sums(const struct node_t *node, double time)
                 same = mul->childs[2];
                 coeff = mul->childs[0];
             }
-            
+
+            // : same * c1 +- same OR same +- same * c1
             if (same && coeff)
             {
                 struct node_t *res_node = new_node();
@@ -546,9 +580,18 @@ struct node_t *optimize_simple_sums(const struct node_t *node, double time)
                 node_add_op->type = (node->childs[1]->type == NODE_TYPE_OP_ADD ? NODE_TYPE_OP_ADD : NODE_TYPE_OP_SUB);
                 node_add_op->end = node_add_op->start = NULL;
 
-                add_child(node_add, coeff);
-                add_child(node_add, node_add_op);
-                add_child(node_add, node2);
+                if (swap)
+                {
+                    add_child(node_add, node2);
+                    add_child(node_add, node_add_op);
+                    add_child(node_add, coeff);
+                }
+                else
+                {
+                    add_child(node_add, coeff);
+                    add_child(node_add, node_add_op);
+                    add_child(node_add, node2);
+                }
                 
                 struct node_t *nodeop = new_node();
                 nodeop->type = NODE_TYPE_OP_MUL;

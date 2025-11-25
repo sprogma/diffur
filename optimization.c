@@ -63,7 +63,15 @@ double optimization_cost(struct node_t *node)
     double res = 1.0;
     for (size_t i = 0; i < node->childs_length; ++i)
     {
-        res += optimization_cost(node->childs[i]);
+        int sign = (node->childs[1]->type == NODE_TYPE_OP_MUL) ||
+                   (node->childs[1]->type == NODE_TYPE_OP_ADD);
+        double ch_res = optimization_cost(node->childs[i]);
+        if (priority[node->childs[i]->type] + (sign || i == 0) <= priority[node->type])
+        {
+            ch_res *= 1.1;
+            ch_res += 2.0;
+        }
+        res += ch_res;
     }
     if (node->type == NODE_TYPE_POW)
     {
@@ -75,7 +83,11 @@ double optimization_cost(struct node_t *node)
     }
     if (node->type == NODE_TYPE_MULDIV && node->childs[1]->type == NODE_TYPE_OP_DIV)
     {
-        res += 5.0;
+        res += 13.0;
+    }
+    if (node->type == NODE_TYPE_ADDSUB && node->childs[1]->type == NODE_TYPE_OP_SUB)
+    {
+        res += 2.5;
     }
     return res;
 }
@@ -95,14 +107,34 @@ struct node_t *optimize_tree_inner(struct node_t *node, double time)
     /* 2. optimize this node */
     for (size_t i = 0; i < optimization_rules_len; ++i)
     {
+        // char buf[10000];
+        // 
+        // char *t = export_basic(buf, node);
+        // *t = 0;
+        
         struct node_t *result = optimization_rules[i](curr_node, time);
+
+        // if (!is_same(result, node))
+        // {
+        //     printf("[ after applying of %lld ]WAS:\n", i);
+        //     printf("%s\n", buf);
+        //     printf("Cost: %g\n", optimization_cost(node));
+        //     
+        //     /* print */
+        //     printf("[ after applying of %lld ]NOW:\n", i);
+        //     t = export_basic(buf, result);
+        //     *t = 0;
+        //     printf("%s\n", buf);
+        //     printf("Cost: %g\n", optimization_cost(result));
+        // }
+        
         /* measure profit */
         double was = optimization_cost(curr_node);
         double now = optimization_cost(result);
         double p = 0.8 * exp(time * (was - now) / 3.0);
         if (time > 0.7)
         {
-            p = 0.8 * (now <= was);
+            p = 0.8 * (now - 1e-4 <= was);
         }
         if (rand() / (RAND_MAX + 1.0) < p)
         {
