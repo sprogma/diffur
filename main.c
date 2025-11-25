@@ -8,6 +8,82 @@
 #include "time.h"
 
 
+struct node_t *ADD(struct node_t *a, struct node_t *b)
+{
+    struct node_t *res = new_node_ex(NODE_TYPE_ADDSUB, "", "");
+    struct node_t *op = new_node_ex(NODE_TYPE_OP_ADD, "", "");
+
+    add_child(res, a);
+    add_child(res, op);
+    add_child(res, b);
+
+    return res;
+}
+
+struct node_t *SUB(struct node_t *a, struct node_t *b)
+{
+    struct node_t *res = new_node_ex(NODE_TYPE_ADDSUB, "", "");
+    struct node_t *op = new_node_ex(NODE_TYPE_OP_SUB, "", "");
+
+    add_child(res, a);
+    add_child(res, op);
+    add_child(res, b);
+
+    return res;
+}
+
+struct node_t *MUL(struct node_t *a, struct node_t *b)
+{
+    struct node_t *res = new_node_ex(NODE_TYPE_MULDIV, "", "");
+    struct node_t *op = new_node_ex(NODE_TYPE_OP_MUL, "", "");
+
+    add_child(res, a);
+    add_child(res, op);
+    add_child(res, b);
+
+    return res;
+}
+
+struct node_t *DIV(struct node_t *a, struct node_t *b)
+{
+    struct node_t *res = new_node_ex(NODE_TYPE_MULDIV, "", "");
+    struct node_t *op = new_node_ex(NODE_TYPE_OP_DIV, "", "");
+
+    add_child(res, a);
+    add_child(res, op);
+    add_child(res, b);
+
+    return res;
+}
+
+struct node_t *POW(struct node_t *a, struct node_t *b)
+{
+    struct node_t *res = new_node_ex(NODE_TYPE_POW, "", "");
+    struct node_t *op = new_node_ex(NODE_TYPE_OP_POW, "", "");
+
+    add_child(res, a);
+    add_child(res, op);
+    add_child(res, b);
+
+    return res;
+}
+
+struct node_t *LOG(struct node_t *a)
+{
+    char *s = strdup("ln");
+    struct node_t *res = new_node_ex(NODE_TYPE_FN_CALL, "", "");
+    struct node_t *fn = new_node_ex(NODE_TYPE_IDENTIFER, s, s + strlen(s));
+    struct node_t *args = new_node_ex(NODE_TYPE_FN_ARGS, "", "");
+
+    add_child(res, fn);
+    add_child(res, args);
+    
+    add_child(args, a);
+
+    return res;
+}
+
+
 struct node_t *derivative(struct node_t *node)
 {
     switch (node->type)
@@ -30,14 +106,7 @@ struct node_t *derivative(struct node_t *node)
             break;
         case NODE_TYPE_ADDSUB:
             {
-                struct node_t *res = new_node();
-                res->type = NODE_TYPE_ADDSUB;
-                res->start = node->start;
-                res->end = node->end;
-
-                add_child(res, node->childs[0]);
-                add_child(res, node->childs[1]);
-                add_child(res, node->childs[2]);
+                struct node_t *res = soft_copy(node);
                 
                 res->childs[0] = derivative(res->childs[0]);
                 res->childs[2] = derivative(res->childs[2]);
@@ -49,31 +118,38 @@ struct node_t *derivative(struct node_t *node)
             { 
                 if (node->childs[1]->type == NODE_TYPE_OP_MUL)
                 {
-                    struct node_t *mul1 = new_node_ex(NODE_TYPE_MULDIV, "", "");
-                    struct node_t *mul1s = new_node_ex(NODE_TYPE_OP_MUL, "", "");
-                    struct node_t *mul2 = new_node_ex(NODE_TYPE_MULDIV, "", "");
-                    struct node_t *mul2s = new_node_ex(NODE_TYPE_OP_MUL, "", "");
-                    struct node_t *add1 = new_node_ex(NODE_TYPE_ADDSUB, "", "");
-                    struct node_t *add1s = new_node_ex(NODE_TYPE_OP_ADD, "", "");
-
-                    add_child(mul1, derivative(node->childs[0]));
-                    add_child(mul1, mul1s);
-                    add_child(mul1, node->childs[2]);
-
-                    add_child(mul2, node->childs[0]);
-                    add_child(mul2, mul2s);
-                    add_child(mul2, derivative(node->childs[2]));
-
-                    add_child(add1, mul1);
-                    add_child(add1, add1s);
-                    add_child(add1, mul2);
-                    
-                    return add1;
+                    return
+                    ADD(
+                        MUL(
+                            derivative(node->childs[0]),
+                            node->childs[2]
+                        ),
+                        MUL(
+                            derivative(node->childs[2]),
+                            node->childs[0]
+                        )
+                    );
                 }
                 else
                 {
-                    printf("NOT SUPPORTED\n");
-                    exit(1);
+                    char *s = strdup("2");
+                    return 
+                    DIV(
+                        SUB(
+                            MUL(
+                                derivative(node->childs[0]),
+                                node->childs[2]
+                            ),
+                            MUL(
+                                derivative(node->childs[2]),
+                                node->childs[0]
+                            )
+                        ),
+                        POW(
+                            node->childs[2],
+                            new_node_ex(NODE_TYPE_FLOAT, s, s + 1)
+                        )
+                    );
                 }
             }
             break;
@@ -81,7 +157,7 @@ struct node_t *derivative(struct node_t *node)
             { 
                 struct node_t *res = new_node();
                 res->type = NODE_TYPE_FLOAT;
-                res->end = res->start = strdup("0");
+                res->end = (res->start = strdup("0")) + 1;
                 return res;
             }
             break;
@@ -91,19 +167,41 @@ struct node_t *derivative(struct node_t *node)
                 { 
                     struct node_t *res = new_node();
                     res->type = NODE_TYPE_FLOAT;
-                    res->end = res->start = strdup("1");
+                    res->end = (res->start = strdup("1")) + 1;
                     return res;
                 }
                 struct node_t *res = new_node();
                 res->type = NODE_TYPE_FLOAT;
-                res->end = res->start = strdup("0");
+                res->end = (res->start = strdup("0")) + 1;
                 return res;
             }
             break;
         case NODE_TYPE_POW:
             {
-                printf("NOT SUPPORTED\n");
-                exit(1);
+                char *s = strdup("1");
+                return 
+                ADD(
+                    MUL(
+                        MUL(
+                            node->childs[2], 
+                            POW(
+                                node->childs[0], 
+                                SUB(node->childs[2], new_node_ex(NODE_TYPE_FLOAT, s, s + 1))
+                            )
+                        ),
+                        derivative(node->childs[0])
+                    ),
+                    MUL(
+                        LOG(node->childs[0]),
+                        MUL(
+                            POW(
+                                node->childs[0],
+                                node->childs[2]
+                            ),
+                            derivative(node->childs[2])
+                        )
+                    )
+                );
             }
             break;
         case NODE_TYPE_FN_ARGS:
@@ -114,14 +212,42 @@ struct node_t *derivative(struct node_t *node)
             break;
         case NODE_TYPE_FN_CALL:
             { 
+                if (strncmp(node->childs[0]->start, "ln", node->childs[0]->end - node->childs[0]->start) == 0)
+                {
+                    char *s = strdup("1");
+                    return 
+                    MUL(
+                        DIV(
+                            new_node_ex(NODE_TYPE_FLOAT, s, s + 1),
+                            node->childs[1]->childs[0]
+                        ),
+                        derivative(node->childs[1]->childs[0])
+                    );
+                }
+                if (strncmp(node->childs[0]->start, "exp", node->childs[0]->end - node->childs[0]->start) == 0)
+                {
+                    return 
+                    MUL(
+                        derivative(node->childs[1]->childs[0]),
+                        node
+                    );
+                }
                 printf("NOT SUPPORTED\n");
                 exit(1);
             }
             break;
         case NODE_TYPE_OP_PREFIX:
-            { 
-                printf("NOT SUPPORTED\n");
-                exit(1);
+            {
+                if (node->childs[0]->type == NODE_TYPE_OP_SUB)
+                {
+                    struct node_t *res = soft_copy(node);
+                    res->childs[1] = derivative(node->childs[1]);
+                    return res;
+                }
+                else
+                {
+                    return derivative(node->childs[1]);
+                }
             }
             break;
     }
@@ -185,30 +311,30 @@ int main()
     t = export_basic(buf, tree);
     *t = 0;
     printf("%s\n", buf);
-// 
-// 
-//     tree = derivative(tree);
-//     
-// 
-//     printf("Derivative tree:\n");
-//     t = export_ast(buf, tree);
-//     *t = 0;
-//     printf("%s\n", buf);
-// 
-// 
-//     tree = optimize_tree(tree);
-//     
-// 
-//     printf("Optimized derivative tree:\n");
-//     t = export_ast(buf, tree);
-//     *t = 0;
-//     printf("%s\n", buf);
-// 
-// 
-//     printf("Exported:\n");
-//     t = export_basic(buf, tree);
-//     *t = 0;
-//     printf("%s\n", buf);
+
+
+    tree = derivative(tree);
+    
+
+    printf("Derivative tree:\n");
+    t = export_ast(buf, tree);
+    *t = 0;
+    printf("%s\n", buf);
+
+
+    tree = optimize_tree(tree);
+    
+
+    printf("Optimized derivative tree:\n");
+    t = export_ast(buf, tree);
+    *t = 0;
+    printf("%s\n", buf);
+
+
+    printf("Exported:\n");
+    t = export_basic(buf, tree);
+    *t = 0;
+    printf("%s\n", buf);
 
     free(buf);
     

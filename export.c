@@ -132,7 +132,15 @@ char *export_basic(char *s, struct node_t *node)
         case NODE_TYPE_OP_PREFIX:
             { 
                 s = export_basic(s, node->childs[0]);
+                if (node->childs[1]->type == NODE_TYPE_ADDSUB)
+                {
+                    s += sprintf(s, "(");
+                }
                 s = export_basic(s, node->childs[1]);
+                if (node->childs[1]->type == NODE_TYPE_ADDSUB)
+                {
+                    s += sprintf(s, ")");
+                }
             }
             break;
     }

@@ -63,13 +63,24 @@ double optimization_cost(struct node_t *node)
     double res = 1.0;
     for (size_t i = 0; i < node->childs_length; ++i)
     {
-        int sign = (node->childs[1]->type == NODE_TYPE_OP_MUL) ||
+        int sign = 0;
+        if (node->type == NODE_TYPE_ADDSUB ||
+            node->type == NODE_TYPE_MULDIV ||
+            node->type == NODE_TYPE_POW)
+        {    
+             sign = (node->childs[1]->type == NODE_TYPE_OP_MUL) ||
                    (node->childs[1]->type == NODE_TYPE_OP_ADD);
+        }
         double ch_res = optimization_cost(node->childs[i]);
-        if (priority[node->childs[i]->type] + (sign || i == 0) <= priority[node->type])
+        if (node->type == NODE_TYPE_ADDSUB ||
+            node->type == NODE_TYPE_MULDIV ||
+            node->type == NODE_TYPE_POW)
         {
-            ch_res *= 1.1;
-            ch_res += 2.0;
+            if (priority[node->childs[i]->type] + (sign || i == 0) <= priority[node->type])
+            {
+                ch_res *= 1.1;
+                ch_res += 2.0;
+            }
         }
         res += ch_res;
     }
@@ -135,6 +146,10 @@ struct node_t *optimize_tree_inner(struct node_t *node, double time)
         if (time > 0.7)
         {
             p = 0.8 * (now - 1e-4 <= was);
+        }
+        if (now > 5000.0)
+        {
+            p = (now - 1e4 <= was);
         }
         if (rand() / (RAND_MAX + 1.0) < p)
         {
