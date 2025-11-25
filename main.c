@@ -5,6 +5,7 @@
 #include "ctype.h"
 #include "string.h"
 #include "stdio.h"
+#include "time.h"
 
 
 struct node_t *derivative(struct node_t *node)
@@ -132,6 +133,8 @@ struct node_t *derivative(struct node_t *node)
 
 int main()
 {
+    srand(time(NULL));
+
     char s[512];
     printf("Enter string to analyze >\n");
     fgets(s, sizeof(s), stdin);
@@ -151,7 +154,7 @@ int main()
 
     struct node_t *tree = result.node;
 
-    char *buf = malloc(1024 * 64), *t = NULL;
+    char *buf = malloc(1024 * 64 * 64), *t = NULL;
     
 
     printf("Parsing completed.\n");
@@ -182,30 +185,30 @@ int main()
     t = export_basic(buf, tree);
     *t = 0;
     printf("%s\n", buf);
-
-
-    tree = derivative(tree);
-    
-
-    printf("Derivative tree:\n");
-    t = export_ast(buf, tree);
-    *t = 0;
-    printf("%s\n", buf);
-
-
-    tree = optimize_tree(tree);
-    
-
-    printf("Optimized derivative tree:\n");
-    t = export_ast(buf, tree);
-    *t = 0;
-    printf("%s\n", buf);
-
-
-    printf("Exported:\n");
-    t = export_basic(buf, tree);
-    *t = 0;
-    printf("%s\n", buf);
+// 
+// 
+//     tree = derivative(tree);
+//     
+// 
+//     printf("Derivative tree:\n");
+//     t = export_ast(buf, tree);
+//     *t = 0;
+//     printf("%s\n", buf);
+// 
+// 
+//     tree = optimize_tree(tree);
+//     
+// 
+//     printf("Optimized derivative tree:\n");
+//     t = export_ast(buf, tree);
+//     *t = 0;
+//     printf("%s\n", buf);
+// 
+// 
+//     printf("Exported:\n");
+//     t = export_basic(buf, tree);
+//     *t = 0;
+//     printf("%s\n", buf);
 
     free(buf);
     

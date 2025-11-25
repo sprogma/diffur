@@ -17,14 +17,15 @@ char *export_basic(char *s, struct node_t *node)
             break;
         case NODE_TYPE_ADDSUB:
             {
+                int sign = node->childs[1]->type == NODE_TYPE_OP_ADD;
                 for (size_t i = 0; i < node->childs_length; i++)
                 {
-                    if (priority[node->childs[i]->type] < priority[node->type])
+                    if (priority[node->childs[i]->type] + (sign || i == 0) <= priority[node->type])
                     {
                         s += sprintf(s, "(");
                     }
                     s = export_basic(s, node->childs[i]);
-                    if (priority[node->childs[i]->type] < priority[node->type])
+                    if (priority[node->childs[i]->type] + (sign || i == 0) <= priority[node->type])
                     {
                         s += sprintf(s, ")");
                     }
@@ -44,14 +45,15 @@ char *export_basic(char *s, struct node_t *node)
             break;
         case NODE_TYPE_MULDIV:
             { 
+                int sign = node->childs[1]->type == NODE_TYPE_OP_MUL;
                 for (size_t i = 0; i < node->childs_length; i++)
                 {
-                    if (priority[node->childs[i]->type] < priority[node->type])
+                    if (priority[node->childs[i]->type] + (sign || i == 0) <= priority[node->type])
                     {
                         s += sprintf(s, "(");
                     }
                     s = export_basic(s, node->childs[i]);
-                    if (priority[node->childs[i]->type] < priority[node->type])
+                    if (priority[node->childs[i]->type] + (sign || i == 0) <= priority[node->type])
                     {
                         s += sprintf(s, ")");
                     }
@@ -89,12 +91,12 @@ char *export_basic(char *s, struct node_t *node)
             { 
                 for (size_t i = 0; i < node->childs_length; i++)
                 {
-                    if (priority[node->childs[i]->type] < priority[node->type])
+                    if (priority[node->childs[i]->type] <= priority[node->type])
                     {
                         s += sprintf(s, "(");
                     }
                     s = export_basic(s, node->childs[i]);
-                    if (priority[node->childs[i]->type] < priority[node->type])
+                    if (priority[node->childs[i]->type] <= priority[node->type])
                     {
                         s += sprintf(s, ")");
                     }

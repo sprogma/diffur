@@ -70,7 +70,7 @@ struct node_t * remove_child(struct node_t *node, size_t child_id)
 }
 
 
-struct node_t * deep_copy(struct node_t *node)
+struct node_t * deep_copy(const struct node_t *node)
 {
     struct node_t *res = new_node();
     res->type = node->type;
@@ -79,6 +79,19 @@ struct node_t * deep_copy(struct node_t *node)
     for (size_t i = 0; i < node->childs_length; ++i)
     {
         add_child(res, deep_copy(node->childs[i]));
+    }
+    return res;
+}
+
+struct node_t * soft_copy(const struct node_t *node)
+{
+    struct node_t *res = new_node();
+    res->type = node->type;
+    res->start = node->start;
+    res->end = node->end;
+    for (size_t i = 0; i < node->childs_length; ++i)
+    {
+        add_child(res, node->childs[i]);
     }
     return res;
 }
