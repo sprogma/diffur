@@ -288,6 +288,11 @@ int main(int argc, char **argv)
     *t = 0;
     printf("%s\n", buf);
 
+    if (argc > 1 && strcmp(argv[1], "t") == 0)
+    {
+        return 0;
+    }
+
 
     tree = normalize_tree(tree);
     
@@ -298,7 +303,7 @@ int main(int argc, char **argv)
     printf("%s\n", buf);
 
 
-    tree = optimize_tree(tree);
+    tree = optimize_tree(tree, 500);
     
 
     printf("Optimized tree:\n");
@@ -342,7 +347,7 @@ int main(int argc, char **argv)
     }
 
 
-    tree = optimize_tree(tree);
+    tree = optimize_tree(tree, 5000);
     
 
     printf("Optimized derivative tree:\n");
