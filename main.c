@@ -257,7 +257,7 @@ struct node_t *derivative(struct node_t *node)
 
 
 
-int main()
+int main(int argc, char **argv)
 {
     srand(time(NULL));
 
@@ -313,6 +313,13 @@ int main()
     printf("%s\n", buf);
 
 
+    if (argc > 1 && strcmp(argv[1], "i") == 0)
+    {
+        printf("Press return to continue\n");
+        getchar();
+    }
+
+
     tree = derivative(tree);
     
 
@@ -320,6 +327,19 @@ int main()
     t = export_ast(buf, tree);
     *t = 0;
     printf("%s\n", buf);
+    
+
+    printf("Derivative export:\n");
+    t = export_basic(buf, tree);
+    *t = 0;
+    printf("%s\n", buf);
+
+
+    if (argc > 1 && strcmp(argv[1], "i") == 0)
+    {
+        printf("Press return to continue\n");
+        getchar();
+    }
 
 
     tree = optimize_tree(tree);
@@ -340,3 +360,10 @@ int main()
     
     return 0;
 }
+
+
+
+
+
+
+
