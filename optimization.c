@@ -105,13 +105,13 @@ double optimization_cost(struct node_t *node)
 
 
 
-struct node_t *optimize_tree_inner(struct node_t *node, double time)
+struct node_t *optimize_tree_inner(struct node_t *node, double time, int too_big)
 {
     struct node_t *curr_node = soft_copy(node);
     /* 1. optimize subnodes */
     for (size_t i = 0; i < node->childs_length; ++i)
     {
-        struct node_t *x = optimize_tree_inner(node->childs[i], time);
+        struct node_t *x = optimize_tree_inner(node->childs[i], time, too_big);
         curr_node->childs[i] = x;
     }
 
@@ -142,14 +142,18 @@ struct node_t *optimize_tree_inner(struct node_t *node, double time)
         /* measure profit */
         double was = optimization_cost(curr_node);
         double now = optimization_cost(result);
-        double p = 0.8 * exp(time * (was - now) / 3.0);
-        if (time > 0.7)
+        double p = 0.8 * exp(time * (was - now) / 0.5);
+        if (was < now)
         {
-            p = 0.8 * (now - 1e-4 <= was);
+            p *= 0.05;
         }
-        if (now > 5000.0)
+        if (time > 0.6)
         {
-            p = (now - 1e4 <= was);
+            p = time * (now - 1e-4 <= was);
+        }
+        if (too_big)
+        {
+            p = (now - 1e-4 <= was);
         }
         if (rand() / (RAND_MAX + 1.0) < p)
         {
@@ -160,16 +164,24 @@ struct node_t *optimize_tree_inner(struct node_t *node, double time)
 }
 
 
-struct node_t *optimize_tree(struct node_t *node)
+struct node_t *optimize_tree(struct node_t *node, int N)
 {
     /* go through tree, apply randomly optimizations */
+<<<<<<< HEAD
     struct node_t *best = node;
     double value = optimization_cost(best);
+=======
+    for (int i = 0; i < N; ++i)
+    {
+        double res = optimization_cost(node);
+        struct node_t *res_node = optimize_tree_inner(node, i / (double)N, res > 5000.0);
+>>>>>>> aae245cc81c8f2b06008bdaf7bf782378bf5091a
 
     for (int t = 0; t < 60; ++t)
     {
         for (int i = 0; i < 400; ++i)
         {
+<<<<<<< HEAD
             struct node_t *res_node = optimize_tree_inner(node, i / 100.0);
 
             // if (!is_same(res_node, node))
@@ -187,6 +199,22 @@ struct node_t *optimize_tree(struct node_t *node)
             // }
             
             node = res_node;
+=======
+            double cost = optimization_cost(res_node);
+
+            double p = exp((0.1 + i / (double)N) * (res - cost) / 10.0);
+            printf("P=%g: %g->%g\n", p, res, cost);
+            if (rand() / (RAND_MAX + 1.0) < p)
+            {
+                char buf[100000];
+                printf("Exported:\n");
+                char *t = export_basic(buf, node);
+                *t = 0;
+                printf("%s\n", buf);
+                printf("Cost: %g\n", cost);
+                node = res_node;
+            }
+>>>>>>> aae245cc81c8f2b06008bdaf7bf782378bf5091a
         }
 
         double cost = optimization_cost(node);

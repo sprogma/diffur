@@ -1,1 +1,7 @@
-"(x-1)^3"|.\a.exe|%{if($_-match"((\^|\+|\-)[^\[\]]*){2}"){$s = $_-replace"\^","**"; $res = py -c "x=3;print(($s))"; "$_  =  $res"}else{$_}}
+param(
+    [string]$s,
+    [double]$x
+)
+$s = $s-replace"\^","**"
+$res = py -c "x=$x;print(($s))";
+"$_  =  $res"
