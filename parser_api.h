@@ -75,7 +75,7 @@ const static int priority[] = {
     // NODE_TYPE_FN_CALL,
     P_INF,
     // NODE_TYPE_OP_PREFIX,
-    +150,
+    +400,
 };
 
 
