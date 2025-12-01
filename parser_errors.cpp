@@ -1,3 +1,4 @@
+#define __USE_MINGW_ANSI_STDIO 1
 #include "parser_errors.h"
 #include "parse.h"
 #include "inttypes.h"
@@ -56,7 +57,7 @@ int print_errors(FILE *file, struct parse_result_t *result, struct parser_error_
     }
     
     fprintf(file, "Compilation error:\n");
-    fprintf(file, "At symbol %"PRIuPTR":\n", error->max_parsed_position - error->source_code);
+    fprintf(file, "At symbol %lld:\n", error->max_parsed_position - error->source_code);
     fprintf(file, "Last parsed node is <%d> [see enum node_type_t], parsing was failed\n", error->max_parsed_node_type);
     print_listing(file, error->source_code, error->max_parsed_position);
     #ifdef SEE_VERBOSE_ERRORS  
@@ -74,11 +75,11 @@ int print_errors(FILE *file, struct parse_result_t *result, struct parser_error_
         }
         
         /* print all variants */
-        fprintf(file, "Located %"PRIuPTR" possible meanings:\n", result->table_length);
+        fprintf(file, "Located %lld possible meanings:\n", result->table_length);
         for (size_t v = 0; v < result->table_length; ++v)
         {
             double score = scores[v];
-            fprintf(file, "Variant %"PRIuPTR": at position %"PRIuPTR" may be <%s>? : SCORE %lf\n", 
+            fprintf(file, "Variant %lld: at position %lld may be <%s>? : SCORE %lf\n", 
                           v, 
                           result->table[v].position - error->source_code, 
                           result->table[v].prediction, 

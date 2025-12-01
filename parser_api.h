@@ -87,6 +87,10 @@ struct node_t
     struct node_t **childs;
     const char *start;
     const char * end;
+
+    long long hash;
+    long long unordered_hash;
+    double cost;
 };
 
 

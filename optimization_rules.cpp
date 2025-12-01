@@ -130,11 +130,12 @@ static struct node_t *optimize_shuffle_ops(const struct node_t *node, double tim
         node->type == NODE_TYPE_MULDIV)
     {
         // a b c
-        // b a c
+        // a c b
         if (node->childs[0]->type == node->type && rand() % 1000 > 800)
         {
             struct node_t *res_node = soft_copy(node);
             struct node_t *leftnode = soft_copy(node->childs[0]);
+            
             /* swap operations and operands */
             res_node->childs[0] = leftnode;
             res_node->childs[1] = node->childs[0]->childs[1]; 
@@ -144,41 +145,22 @@ static struct node_t *optimize_shuffle_ops(const struct node_t *node, double tim
             
             return res_node;
         }
-        // a c b
-        if (node->childs[2]->type == node->type && rand() % 1000 > 700)
+        // a b c
+        // b a c
+        if (node->childs[2]->type == node->type && (node->childs[1]->type == NODE_TYPE_OP_ADD || 
+                                                    node->childs[1]->type == NODE_TYPE_OP_MUL) && rand() % 1000 > 700)
         {
             struct node_t *res_node = soft_copy(node);
-            struct node_t *leftnode = soft_copy(node->childs[2]);
-            struct node_t *leftnodeop = soft_copy(node->childs[2]->childs[1]);
-
-            res_node->childs[0] = leftnode;
-            res_node->childs[2] = node->childs[2]->childs[0];
-            
-            leftnode->childs[0] = node->childs[0];
-            leftnode->childs[1] = leftnodeop;
-            leftnode->childs[2] = node->childs[2]->childs[2];
+            struct node_t *rightnode = soft_copy(node->childs[2]);
 
             /* swap operations and operands */
-            if (node->childs[1]->type == NODE_TYPE_OP_SUB || 
-                node->childs[1]->type == NODE_TYPE_OP_DIV)
-            {
-                if (leftnodeop->type == NODE_TYPE_OP_ADD)
-                {
-                    leftnodeop->type = NODE_TYPE_OP_SUB;
-                }
-                else if (leftnodeop->type == NODE_TYPE_OP_SUB)
-                {
-                    leftnodeop->type = NODE_TYPE_OP_ADD;
-                }
-                else if (leftnodeop->type == NODE_TYPE_OP_MUL)
-                {
-                    leftnodeop->type = NODE_TYPE_OP_DIV;
-                }
-                else if (leftnodeop->type == NODE_TYPE_OP_DIV)
-                {
-                    leftnodeop->type = NODE_TYPE_OP_MUL;
-                }
-            }
+            res_node->childs[0] = node->childs[2]->childs[0];
+            res_node->childs[1] = node->childs[1];
+            res_node->childs[2] = rightnode;
+            rightnode->childs[0] = node->childs[0];
+            rightnode->childs[1] = node->childs[2]->childs[1];
+            rightnode->childs[2] = node->childs[2]->childs[2];
+            
             return res_node;
         }
         // a +- (b +- c) -> (a +- b) +-/-+ c
@@ -186,14 +168,14 @@ static struct node_t *optimize_shuffle_ops(const struct node_t *node, double tim
         {
             struct node_t *res_node = soft_copy(node);
             struct node_t *leftnode = soft_copy(node->childs[2]);
-            struct node_t *leftnodeop = soft_copy(node->childs[2]->childs[1]);
+            struct node_t *resnodeop = soft_copy(node->childs[2]->childs[1]);
 
             leftnode->childs[0] = node->childs[0];
             leftnode->childs[1] = node->childs[1];
             leftnode->childs[2] = node->childs[2]->childs[0];
 
             res_node->childs[0] = leftnode;
-            res_node->childs[1] = leftnodeop;
+            res_node->childs[1] = resnodeop;
             res_node->childs[2] = node->childs[2]->childs[2];
             
 
@@ -201,21 +183,21 @@ static struct node_t *optimize_shuffle_ops(const struct node_t *node, double tim
             if (node->childs[1]->type == NODE_TYPE_OP_SUB || 
                 node->childs[1]->type == NODE_TYPE_OP_DIV)
             {
-                if (leftnodeop->type == NODE_TYPE_OP_ADD)
+                if (resnodeop->type == NODE_TYPE_OP_ADD)
                 {
-                    leftnodeop->type = NODE_TYPE_OP_SUB;
+                    resnodeop->type = NODE_TYPE_OP_SUB;
                 }
-                else if (leftnodeop->type == NODE_TYPE_OP_SUB)
+                else if (resnodeop->type == NODE_TYPE_OP_SUB)
                 {
-                    leftnodeop->type = NODE_TYPE_OP_ADD;
+                    resnodeop->type = NODE_TYPE_OP_ADD;
                 }
-                else if (leftnodeop->type == NODE_TYPE_OP_MUL)
+                else if (resnodeop->type == NODE_TYPE_OP_MUL)
                 {
-                    leftnodeop->type = NODE_TYPE_OP_DIV;
+                    resnodeop->type = NODE_TYPE_OP_DIV;
                 }
-                else if (leftnodeop->type == NODE_TYPE_OP_DIV)
+                else if (resnodeop->type == NODE_TYPE_OP_DIV)
                 {
-                    leftnodeop->type = NODE_TYPE_OP_MUL;
+                    resnodeop->type = NODE_TYPE_OP_MUL;
                 }
             }
             return res_node;
@@ -258,7 +240,7 @@ static struct node_t *optimize_shuffle_ops(const struct node_t *node, double tim
             }
             return res_node;
         }
-        if ((node->childs[1]->type == NODE_TYPE_OP_MUL || node->childs[1]->type == NODE_TYPE_OP_ADD) && rand() % 1000 > 450)
+        if ((node->childs[1]->type == NODE_TYPE_OP_MUL || node->childs[1]->type == NODE_TYPE_OP_ADD) && rand() % 1000 > 250)
         {
             struct node_t *res_node = soft_copy(node);
             res_node->childs[0] = node->childs[2];
@@ -302,7 +284,7 @@ static struct node_t *optimize_neutral_elements(const struct node_t *node, doubl
                     {
                         struct node_t *res_node = soft_copy(node);
                         res_node->start = strdup("1");
-                        res_node->end = node->childs[2]->start + 1;
+                        res_node->end = res_node->start + 1;
                         res_node->type = NODE_TYPE_FLOAT;
                         return res_node;
                     }
@@ -659,6 +641,11 @@ struct node_t *optimize_simple_muls(const struct node_t *node, double time)
             struct node_t *res_node = new_node_ex(NODE_TYPE_POW, NULL, NULL);
             struct node_t *addnode = new_node_ex(NODE_TYPE_ADDSUB, NULL, NULL);
             struct node_t *addop = new_node_ex(NODE_TYPE_OP_ADD, NULL, NULL);
+
+            if (node->childs[1]->type == NODE_TYPE_OP_DIV)
+            {
+                addop->type = NODE_TYPE_OP_SUB;
+            }
 
             add_child(addnode, node->childs[0]->childs[2]);
             add_child(addnode, addop);
