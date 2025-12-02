@@ -6,6 +6,7 @@
 #include "string.h"
 #include "ctype.h"
 #include "stdio.h"
+#include "omp.h"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
@@ -359,7 +360,10 @@ void draw_text(int x, int y, char *text)
 }
 
 
-struct node_t *optimize_tree(struct node_t *node, int N, int K)
+
+
+#define PARALLEL
+struct node_t *optimize_tree(struct node_t *node, int N, int K, int interactive)
 {
     tree_map.clear();
     hotspot_map.clear();
@@ -401,97 +405,127 @@ struct node_t *optimize_tree(struct node_t *node, int N, int K)
 
     /* go through tree, apply randomly optimizations */
     int tim = 0;
+    #ifdef PARALLEL
+    #pragma omp parallel for schedule(dynamic) default(shared)
+    #endif
     for (int i = 0; i < N; ++i)
     {
-        while (SDL_PollEvent(&event)) {}
-        
-        if (SDL_GetTicks() > tim)
+        if (omp_get_thread_num() == 0)
         {
-            tim = SDL_GetTicks() + 16;
-            SDL_RenderPresent(renderer);
+            while (SDL_PollEvent(&event)) {}
+            
+            if (SDL_GetTicks() > tim)
+            {
+                tim = SDL_GetTicks() + 16;
+                SDL_RenderPresent(renderer);
+            }
+            printf("i=%d, %d nodes [by thread %d]\n", i, hotspot_map.size(), omp_get_thread_num());
         }
 
-        /* select random node with x^2 prob */
-        double partition = rand() / (RAND_MAX + 1.0);
-        partition *= partition;
-        partition *= (double)(N - i) / N;
-        size_t index = partition * tree_map.size();
+        struct node_t *cur_node = NULL;
+        double cur_cost;
+        double cur_hot;
+        double cur_new_hot;
 
+        #ifdef PARALLEL
+        #pragma omp critical (ResourceA) 
+        #endif
+        {
+            if (hotspot_map.size() != 0)
+            {
+                /* select random node with x^2 prob */
+                double partition = rand() / (RAND_MAX + 1.0);
+                partition *= partition;
+                partition *= (double)(N - i) / N;
+                size_t index = partition * hotspot_map.size();
 
-        auto [cur_hot, cur_node] = *hotspot_map.find_by_order(index);
-        double cur_cost = cost(cur_node);
-        double cur_new_hot = cur_hot / (1.0 + cur_cost / 350.0);
+                auto x = hotspot_map.find_by_order(index);
+                cur_node = x->second;
+                cur_hot = x->first;
 
-        int bad_nodes = 0;
+                paint_remove_node(cur_node, cur_hot, W, H);
+                hotspot_map.erase(hotspot_map.find_by_order(index));
+            }
+            else
+            {
+                cur_node = node;
+                cur_hot = T0;
+            }
+        }
+
+        
+        cur_cost = cost(cur_node);
+        cur_new_hot = cur_hot / (1.0 + cur_cost / 350.0);
         
         /* mutate node some times */
+        int bad_nodes = 0;
         for (int t = 0; t < (i < 50 ? 1000 : K); ++t)
         {
             struct node_t *res_node;
             res_node = mutate_tree_inner(cur_node, i / (double)N, cur_cost > 5000.0);
-            // res_node = mutate_tree_inner(res_node, i / (double)N, cur_cost > 5000.0);
-            // {
-            //     char s[1000], *t;
-            //     t = export_basic(s, res_node);
-            //     *t = 0;
-            //     printf("result: %s [%lld]\n", s, tree_hash(res_node));
-            // }
+            double res_cost = cost(res_node);
+            
 
             /* is node used? */
-            if (used.find(tree_hash(res_node)) != used.end())
+            #ifdef PARALLEL
+            #pragma omp critical (ResourceA) 
+            #endif
             {
-                /* decrease node value */
-                if (cur_node != tree_parent[used[tree_hash(res_node)]])
+                if (used.find(tree_hash(res_node)) != used.end())
                 {
-                    // cur_new_hot *= 0.95;
-                    bad_nodes++;
-                }
+                    /* decrease node value */
+                    if (cur_node != tree_parent[used[tree_hash(res_node)]])
+                    {
+                        // cur_new_hot *= 0.95;
+                        bad_nodes++;
+                    }
 
-                if (tree_depth[cur_node] + 1 < tree_depth[used[tree_hash(res_node)]])
-                {
-                    tree_depth[used[tree_hash(res_node)]] = tree_depth[cur_node] + 1;
-                    tree_parent[used[tree_hash(res_node)]] = cur_node;
-                }
-            }
-            else
-            {
-                /* add new node */
-                double res_cost = cost(res_node);
-                double delta = cur_cost - res_cost;
-                double res_hot = cur_hot * 0.995 + 20.0 * delta; // * (1 + 0.3 * (res_cost < cur_cost));
-
-                if (res_cost - 1e-6 > cur_cost)
-                {
-                    // was_better = 1;
-                    bad_nodes++;
+                    if (tree_depth[cur_node] + 1 < tree_depth[used[tree_hash(res_node)]])
+                    {
+                        tree_depth[used[tree_hash(res_node)]] = tree_depth[cur_node] + 1;
+                        tree_parent[used[tree_hash(res_node)]] = cur_node;
+                    }
                 }
                 else
                 {
-                    bad_nodes--;
-                }
-                
-                hotspot_map.insert({res_hot, res_node});
-                paint_update_node(res_node, res_hot, W, H);
-                tree_map.insert({res_cost, res_node});
-                used[tree_hash(res_node)] = res_node;
+                    /* add new node */
+                    double delta = cur_cost - res_cost;
+                    double res_hot = cur_hot * 0.995 + 20.0 * delta; // * (1 + 0.3 * (res_cost < cur_cost));
 
-                tree_parent[res_node] = cur_node;
-                tree_depth[res_node] = tree_depth[cur_node] + 1;
+                    if (res_cost - 1e-6 > cur_cost)
+                    {
+                        // was_better = 1;
+                        bad_nodes++;
+                    }
+                    else
+                    {
+                        bad_nodes--;
+                    }
+                    
+                    hotspot_map.insert({res_hot, res_node});
+                    paint_update_node(res_node, res_hot, W, H);
+                    tree_map.insert({res_cost, res_node});
+                    used[tree_hash(res_node)] = res_node;
+
+                    tree_parent[res_node] = cur_node;
+                    tree_depth[res_node] = tree_depth[cur_node] + 1;
+                }
             }
         }
 
-        if (bad_nodes > 0)
+        #ifdef PARALLEL
+        #pragma omp critical (ResourceA)
+        #endif
         {
-            /* decrease node value */
-            cur_new_hot *= 0.95;
+            if (bad_nodes > 0)
+            {
+                /* decrease node value */
+                cur_new_hot *= 0.95;
+            }
+            
+            hotspot_map.insert({cur_new_hot, cur_node});        
+            paint_update_node(cur_node, cur_new_hot, W, H);
         }
-        
-        paint_remove_node(cur_node, cur_hot, W, H);
-        hotspot_map.erase(hotspot_map.find_by_order(index));
-        hotspot_map.insert({cur_new_hot, cur_node});        
-        paint_update_node(cur_node, cur_new_hot, W, H);
-
-        printf("i=%d, %d nodes\n", i, hotspot_map.size());
     }
 
     printf("WAITING TO PRESS\n");
@@ -508,26 +542,13 @@ struct node_t *optimize_tree(struct node_t *node, int N, int K)
             id++;
         }
     }
-    while (1) {
+    while (interactive) 
+    {
         if (SDL_PollEvent(&event)){
             if (event.type == SDL_MOUSEBUTTONDOWN){break;} 
         }
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
-        SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
-        // {
-        //     int id = 0;
-        //     for (auto &t : hotspot_map)
-        //     {
-        //         struct node_t *parent = tree_parent[t.second];
-        //         if (parent)
-        //         {
-        //             double x, y; node_to_xy(parent, hots[parent], &x, &y);
-        //             SDL_RenderDrawLineF(renderer, points[id].x, points[id].y, x * W, y * H);
-        //         }
-        //         id++;
-        //     }
-        // }
         SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
         SDL_RenderDrawPointsF(renderer, points, hotspot_map.size());
         
