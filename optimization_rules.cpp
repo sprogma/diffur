@@ -551,7 +551,7 @@ struct node_t *optimize_simple_sums(const struct node_t *node, double time)
                 
                 struct node_t *node_add = new_node();
                 node_add->type = NODE_TYPE_ADDSUB;
-                node_add->start = node_add->start = strdup("");
+                node_add->end = node_add->start = strdup("");
                 
                 struct node_t *node2 = new_node();
                 node2->type = NODE_TYPE_FLOAT;

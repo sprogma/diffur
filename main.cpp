@@ -302,7 +302,7 @@ int main(int argc, char **argv)
     printf("%s\n", buf);
 
 
-    tree = optimize_tree(tree, 5000);
+    tree = optimize_tree(tree, 5000, 50);
     
 
     printf("Optimized tree:\n");
@@ -352,7 +352,7 @@ int main(int argc, char **argv)
     }
 
 
-    tree = optimize_tree(tree, 5000);
+    tree = optimize_tree(tree, 5000, 50);
     
 
     printf("Optimized derivative tree:\n");

@@ -66,6 +66,10 @@ void add_child(struct node_t *node, struct node_t *new_child)
         node->childs = new_ptr;
     }
     node->childs[node->childs_length++] = new_child;
+
+    node->hash = 0;
+    node->unordered_hash = 0;
+    node->cost = -1.0;
 }
 
 

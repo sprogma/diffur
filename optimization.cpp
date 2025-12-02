@@ -31,6 +31,7 @@ std::map<std::vector<int64_t>, int64_t> hash_map;
 std::map<std::vector<int64_t>, int64_t> unordered_hash_map;
 std::unordered_map<int64_t, struct node_t *>used;
 std::unordered_map<struct node_t *, struct node_t *> tree_parent;
+std::unordered_map<struct node_t *, int64_t> tree_depth;
 ordered_multimap<double, struct node_t *> tree_map;
 ordered_multimap_desc<double, struct node_t *> hotspot_map;
 
@@ -60,11 +61,13 @@ int64_t hash_leaf(struct node_t *v, std::map<std::vector<int64_t>, int64_t> &map
     
     if (map.find(childs) != map.end())
     {
-        v->hash = map[childs];
+        return map[childs];
     }
     else
     {
-        v->hash = map[childs] = map.size() + 1;
+        int64_t res = map.size() + 1;
+        map[childs] = res;
+        return res;
     }
 }
 
@@ -92,7 +95,8 @@ int64_t tree_hash(struct node_t *v)
         }
         else
         {
-            v->hash = hash_map[childs] = hash_map.size() + 1;
+            int64_t res = hash_map.size() + 1;
+            v->hash = hash_map[childs] = res;
         }
     }
     return v->hash;
@@ -129,7 +133,8 @@ int64_t tree_unordered_hash(struct node_t *v)
         }
         else
         {
-            v->unordered_hash = unordered_hash_map[childs] = unordered_hash_map.size() + 1;
+            int64_t res = unordered_hash_map.size() + 1;
+            v->hash = unordered_hash_map[childs] = res;
         }
     }
     return v->unordered_hash;
@@ -210,7 +215,7 @@ double cost(struct node_t *node)
             {
                 if (priority[node->childs[i]->type] + (sign || i == 0) <= priority[node->type])
                 {
-                    // ch_res *= 1.1;
+                    ch_res *= 1.05;
                     ch_res += 2.0;
                 }
             }
@@ -230,7 +235,7 @@ double cost(struct node_t *node)
         }
         if (node->type == NODE_TYPE_ADDSUB && node->childs[1]->type == NODE_TYPE_OP_SUB)
         {
-            res += 2.5;
+            res += 1.0;
         }
 
         node->cost = res;
@@ -265,12 +270,8 @@ struct node_t *mutate_tree_inner(struct node_t *node, double time, int too_big)
             /* measure profit */
             double was = cost(curr_node);
             double now = cost(result);
-            double p = 0.8 * exp(time * (was - now) / 0.5);
-            if (was < now)
-            {
-                p *= 0.05;
-            }
-            if (time > 0.6)
+            double p = 0.8 * exp(time * (was - now) / 4.0);
+            if (time > 0.9)
             {
                 p = time * (now - 1e-4 <= was);
             }
@@ -358,7 +359,7 @@ void draw_text(int x, int y, char *text)
 }
 
 
-struct node_t *optimize_tree(struct node_t *node, int N)
+struct node_t *optimize_tree(struct node_t *node, int N, int K)
 {
     tree_map.clear();
     hotspot_map.clear();
@@ -373,6 +374,7 @@ struct node_t *optimize_tree(struct node_t *node, int N)
     tree_map[cost(node)] = node;
     hotspot_map[T0] = node;
     tree_parent[node] = node;
+    tree_depth[node] = 0;
 
     int W = 900, H = 900;
     SDL_Event event;
@@ -423,11 +425,17 @@ struct node_t *optimize_tree(struct node_t *node, int N)
         int bad_nodes = 0;
         
         /* mutate node some times */
-        for (int t = 0; t < (i < 50 ? 1000 : 100); ++t)
+        for (int t = 0; t < (i < 50 ? 1000 : K); ++t)
         {
             struct node_t *res_node;
             res_node = mutate_tree_inner(cur_node, i / (double)N, cur_cost > 5000.0);
             // res_node = mutate_tree_inner(res_node, i / (double)N, cur_cost > 5000.0);
+            // {
+            //     char s[1000], *t;
+            //     t = export_basic(s, res_node);
+            //     *t = 0;
+            //     printf("result: %s [%lld]\n", s, tree_hash(res_node));
+            // }
 
             /* is node used? */
             if (used.find(tree_hash(res_node)) != used.end())
@@ -437,6 +445,12 @@ struct node_t *optimize_tree(struct node_t *node, int N)
                 {
                     // cur_new_hot *= 0.95;
                     bad_nodes++;
+                }
+
+                if (tree_depth[cur_node] + 1 < tree_depth[used[tree_hash(res_node)]])
+                {
+                    tree_depth[used[tree_hash(res_node)]] = tree_depth[cur_node] + 1;
+                    tree_parent[used[tree_hash(res_node)]] = cur_node;
                 }
             }
             else
@@ -462,6 +476,7 @@ struct node_t *optimize_tree(struct node_t *node, int N)
                 used[tree_hash(res_node)] = res_node;
 
                 tree_parent[res_node] = cur_node;
+                tree_depth[res_node] = tree_depth[cur_node] + 1;
             }
         }
 
