@@ -347,7 +347,7 @@ void draw_text(int x, int y, char *text)
 
     SDL_Rect Message_rect;
     Message_rect.x = x;
-    Message_rect.y = y;
+    Message_rect.y = y - surfaceMessage->h;
     Message_rect.w = surfaceMessage->w;
     Message_rect.h = surfaceMessage->h;
 
@@ -372,6 +372,7 @@ struct node_t *optimize_tree(struct node_t *node, int N)
 
     tree_map[cost(node)] = node;
     hotspot_map[T0] = node;
+    tree_parent[node] = node;
 
     int W = 900, H = 900;
     SDL_Event event;
@@ -417,12 +418,12 @@ struct node_t *optimize_tree(struct node_t *node, int N)
 
         auto [cur_hot, cur_node] = *hotspot_map.find_by_order(index);
         double cur_cost = cost(cur_node);
-        double cur_new_hot = cur_hot * (1.0 / (1.0 + 10.0 * cur_cost));
+        double cur_new_hot = cur_hot / (1.0 + cur_cost / 350.0);
 
-        int was_better = 0;
+        int bad_nodes = 0;
         
         /* mutate node some times */
-        for (int t = 0; t < (i < 50 ? 100 : 10); ++t)
+        for (int t = 0; t < (i < 50 ? 1000 : 100); ++t)
         {
             struct node_t *res_node;
             res_node = mutate_tree_inner(cur_node, i / (double)N, cur_cost > 5000.0);
@@ -432,9 +433,10 @@ struct node_t *optimize_tree(struct node_t *node, int N)
             if (used.find(tree_hash(res_node)) != used.end())
             {
                 /* decrease node value */
-                // if (tree_hash(res_node) != tree_hash(tree_parent[cur_node]))
+                if (cur_node != tree_parent[used[tree_hash(res_node)]])
                 {
-                    cur_new_hot *= 0.95;
+                    // cur_new_hot *= 0.95;
+                    bad_nodes++;
                 }
             }
             else
@@ -446,7 +448,12 @@ struct node_t *optimize_tree(struct node_t *node, int N)
 
                 if (res_cost - 1e-6 > cur_cost)
                 {
-                    was_better = 1;
+                    // was_better = 1;
+                    bad_nodes++;
+                }
+                else
+                {
+                    bad_nodes--;
                 }
                 
                 hotspot_map.insert({res_hot, res_node});
@@ -458,7 +465,7 @@ struct node_t *optimize_tree(struct node_t *node, int N)
             }
         }
 
-        if (!was_better)
+        if (bad_nodes > 0)
         {
             /* decrease node value */
             cur_new_hot *= 0.95;
@@ -521,7 +528,7 @@ struct node_t *optimize_tree(struct node_t *node, int N)
         }
         if (sel)
         {
-            char buf[2048];
+            char buf[1024 * 32];
             char *text = export_basic(buf, sel);
             *text = 0;
             draw_text(selX, selY, buf);
@@ -535,6 +542,28 @@ struct node_t *optimize_tree(struct node_t *node, int N)
     SDL_Quit();
     
     printf("RESULT TREE: score=%g\n", tree_map.begin()->first);
+
+    /* print path to result */
+
+    printf("Key optimization moves: ----------------- \n");
+    {
+        std::vector<struct node_t *> path(1, tree_map.begin()->second);
+        while (tree_parent[path.back()] != path.back())
+        {
+            path.push_back(tree_parent[path.back()]);
+        }
+        std::reverse(path.begin(), path.end());
+
+        char buf[1024 * 32];
+        int id = 0;
+        for (auto v : path)
+        {
+            char *text = export_basic(buf, v);
+            *text = 0;
+            printf("%d.   %s\n", id, buf);
+            id++;
+        }
+    }
     
     return tree_map.begin()->second;
 }
