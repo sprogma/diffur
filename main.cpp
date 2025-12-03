@@ -205,7 +205,7 @@ struct node_t *derivative(struct node_t *node)
             }
             break;
 
-            optimize (Add (Var v) (Sub (Var v) (Imm 0)) = Add 5 5
+            // optimize (Add (Var v) (Sub (Var v) (Imm 0)) = Add 5 5
             
         case NODE_TYPE_FN_ARGS:
             {

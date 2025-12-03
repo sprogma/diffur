@@ -113,16 +113,19 @@ static struct node_t *optimize_add_with_prefix_minus(const struct node_t *node, 
         node->childs[2]->childs[0]->type == NODE_TYPE_OP_SUB)
     {
         struct node_t *res_node = soft_copy(node);
+        struct node_t *res_node_op = soft_copy(node->childs[1]);
+
+        res_node->childs[1] = res_node_op;
         
-        if (res_node->childs[1]->type == NODE_TYPE_OP_SUB)
+        if (res_node_op->type == NODE_TYPE_OP_SUB)
         {
-            res_node->childs[1]->type = NODE_TYPE_OP_ADD;
+            res_node_op->type = NODE_TYPE_OP_ADD;
         }
         else
         {
-            res_node->childs[1]->type = NODE_TYPE_OP_SUB;
+            res_node_op->type = NODE_TYPE_OP_SUB;
         }
-        res_node->childs[2] = res_node->childs[2]->childs[1];
+        res_node->childs[2] = node->childs[2]->childs[1];
         return res_node;
     }
     return (struct node_t *)node;
@@ -273,11 +276,7 @@ static struct node_t *optimize_neutral_elements(const struct node_t *node, doubl
                     {
                         return node->childs[0];
                     }
-<<<<<<< HEAD:optimization_rules.c
-                    if (fabs(x - 1.0) < 1e-6) // TODO: compare_doubles
-=======
                     if (is_near(x, 1.0))
->>>>>>> 956bf2b1063ae0796d10124e9eb9ffa7e77650a0:optimization_rules.cpp
                     {
                         return node->childs[0];
                     }
@@ -554,7 +553,7 @@ struct node_t *optimize_simple_sums(const struct node_t *node, double time)
             }
 
             // : same * c1 +- same OR same +- same * c1
-            if (same && coeff)
+            if (same && coeff && rand() % 1000 < 800)
             {
                 struct node_t *res_node = new_node();
                 res_node->type = NODE_TYPE_MULDIV;
@@ -670,17 +669,20 @@ struct node_t *optimize_simple_muls(const struct node_t *node, double time)
         if (node->childs[0]->type == NODE_TYPE_POW || 
             node->childs[2]->type == NODE_TYPE_POW)
         {
+            int64_t swap = 0;
             struct node_t *pow = NULL;
             struct node_t *other = NULL;
             if (node->childs[0]->type == NODE_TYPE_POW)
             {
                 pow = node->childs[0];
                 other = node->childs[2];
+                swap = 0;
             }
             else
             {
                 pow = node->childs[2];
                 other = node->childs[0];
+                swap = 1;
             }
 
             if (is_same(pow->childs[0], other))
@@ -701,9 +703,18 @@ struct node_t *optimize_simple_muls(const struct node_t *node, double time)
                 node_add_op->type = (node->childs[1]->type == NODE_TYPE_OP_MUL ? NODE_TYPE_OP_ADD : NODE_TYPE_OP_SUB);
                 node_add_op->end = node_add_op->start = NULL;
 
-                add_child(node_add, pow->childs[2]);
-                add_child(node_add, node_add_op);
-                add_child(node_add, node2);
+                if (swap)
+                {
+                    add_child(node_add, node2);
+                    add_child(node_add, node_add_op);
+                    add_child(node_add, pow->childs[2]);
+                }
+                else
+                {
+                    add_child(node_add, pow->childs[2]);
+                    add_child(node_add, node_add_op);
+                    add_child(node_add, node2);
+                }
                 
                 struct node_t *nodeop = new_node();
                 nodeop->type = NODE_TYPE_OP_POW;
