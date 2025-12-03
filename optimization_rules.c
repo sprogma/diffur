@@ -285,7 +285,7 @@ static struct node_t *optimize_neutral_elements(const struct node_t *node, doubl
                     {
                         return node->childs[0];
                     }
-                    if (fabs(x - 1.0) < 1e-6)
+                    if (fabs(x - 1.0) < 1e-6) // TODO: compare_doubles
                     {
                         return node->childs[0];
                     }
@@ -449,7 +449,7 @@ struct node_t *optimize_simple_sums(const struct node_t *node, double time)
 {
     if (node->type == NODE_TYPE_ADDSUB)
     {
-        if (rand() % 1000 < time * 1000)
+        if (rand() % 1000 < time * 1000) // TODO: 1000?
         {
             if (is_same(node->childs[0], node->childs[2]))
             {
