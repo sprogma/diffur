@@ -291,11 +291,17 @@ int main(int argc, char **argv)
     *t = 0;
     printf("%s\n", buf);
 
+    int interactive = 1;
+
+    if (argc > 1 && strcmp(argv[1], "z") == 0)
+    {
+        interactive = 0;
+    }
+
     if (argc > 1 && strcmp(argv[1], "t") == 0)
     {
         return 0;
     }
-
 
     tree = normalize_tree(tree);
     
@@ -306,7 +312,7 @@ int main(int argc, char **argv)
     printf("%s\n", buf);
 
 
-    tree = optimize_tree(tree, 500);
+    tree = optimize_tree(tree, 5000, 50, interactive);
     
 
     printf("Optimized tree:\n");
@@ -325,6 +331,12 @@ int main(int argc, char **argv)
     {
         printf("Press return to continue\n");
         getchar();
+    }
+
+
+    if (argc > 1 && strcmp(argv[1], "n") == 0)
+    {
+        return 0;
     }
 
 
@@ -350,7 +362,7 @@ int main(int argc, char **argv)
     }
 
 
-    tree = optimize_tree(tree, 5000);
+    tree = optimize_tree(tree, 5000, 50, interactive);
     
 
     printf("Optimized derivative tree:\n");
@@ -368,8 +380,6 @@ int main(int argc, char **argv)
     
     return 0;
 }
-
-
 
 
 

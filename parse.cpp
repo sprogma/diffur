@@ -10,6 +10,10 @@ struct node_t *new_node()
 {
     struct node_t *node = calloc(1, sizeof(*node));
 
+    node->hash = 0;
+    node->unordered_hash = 0;
+    node->cost = -1.0;
+
     if (node == NULL) { puts("No more memory"); exit(2); }
     
     return node;
@@ -24,6 +28,10 @@ struct node_t *new_node_ex(enum node_type_t type,
     node->type = type;
     node->start = start;
     node->end = end;
+
+    node->hash = 0;
+    node->unordered_hash = 0;
+    node->cost = -1.0;
 
     if (node == NULL) { puts("No more memory"); exit(2); }
     
@@ -58,6 +66,10 @@ void add_child(struct node_t *node, struct node_t *new_child)
         node->childs = new_ptr;
     }
     node->childs[node->childs_length++] = new_child;
+
+    node->hash = 0;
+    node->unordered_hash = 0;
+    node->cost = -1.0;
 }
 
 

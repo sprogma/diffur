@@ -75,7 +75,7 @@ const static int priority[] = {
     // NODE_TYPE_FN_CALL,
     P_INF,
     // NODE_TYPE_OP_PREFIX,
-    +150,
+    +400,
 };
 
 
@@ -87,6 +87,10 @@ struct node_t
     struct node_t **childs;
     const char *start;
     const char * end;
+
+    long long hash;
+    long long unordered_hash;
+    double cost;
 };
 
 

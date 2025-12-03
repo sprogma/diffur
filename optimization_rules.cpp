@@ -8,6 +8,12 @@
 #include "stdio.h"
 
 
+static int is_near(double a, double b)
+{
+    return fabs(a - b) < 1e-6;
+}
+
+
 static struct node_t *optimize_addsubpow_constants(const struct node_t *node, double time)
 {
     (void)time;
@@ -130,11 +136,12 @@ static struct node_t *optimize_shuffle_ops(const struct node_t *node, double tim
         node->type == NODE_TYPE_MULDIV)
     {
         // a b c
-        // b a c
+        // a c b
         if (node->childs[0]->type == node->type && rand() % 1000 > 800)
         {
             struct node_t *res_node = soft_copy(node);
             struct node_t *leftnode = soft_copy(node->childs[0]);
+            
             /* swap operations and operands */
             res_node->childs[0] = leftnode;
             res_node->childs[1] = node->childs[0]->childs[1]; 
@@ -144,41 +151,22 @@ static struct node_t *optimize_shuffle_ops(const struct node_t *node, double tim
             
             return res_node;
         }
-        // a c b
-        if (node->childs[2]->type == node->type && rand() % 1000 > 700)
+        // a b c
+        // b a c
+        if (node->childs[2]->type == node->type && (node->childs[1]->type == NODE_TYPE_OP_ADD || 
+                                                    node->childs[1]->type == NODE_TYPE_OP_MUL) && rand() % 1000 > 700)
         {
             struct node_t *res_node = soft_copy(node);
-            struct node_t *leftnode = soft_copy(node->childs[2]);
-            struct node_t *leftnodeop = soft_copy(node->childs[2]->childs[1]);
-
-            res_node->childs[0] = leftnode;
-            res_node->childs[2] = node->childs[2]->childs[0];
-            
-            leftnode->childs[0] = node->childs[0];
-            leftnode->childs[1] = leftnodeop;
-            leftnode->childs[2] = node->childs[2]->childs[2];
+            struct node_t *rightnode = soft_copy(node->childs[2]);
 
             /* swap operations and operands */
-            if (node->childs[1]->type == NODE_TYPE_OP_SUB || 
-                node->childs[1]->type == NODE_TYPE_OP_DIV)
-            {
-                if (leftnodeop->type == NODE_TYPE_OP_ADD)
-                {
-                    leftnodeop->type = NODE_TYPE_OP_SUB;
-                }
-                else if (leftnodeop->type == NODE_TYPE_OP_SUB)
-                {
-                    leftnodeop->type = NODE_TYPE_OP_ADD;
-                }
-                else if (leftnodeop->type == NODE_TYPE_OP_MUL)
-                {
-                    leftnodeop->type = NODE_TYPE_OP_DIV;
-                }
-                else if (leftnodeop->type == NODE_TYPE_OP_DIV)
-                {
-                    leftnodeop->type = NODE_TYPE_OP_MUL;
-                }
-            }
+            res_node->childs[0] = node->childs[2]->childs[0];
+            res_node->childs[1] = node->childs[1];
+            res_node->childs[2] = rightnode;
+            rightnode->childs[0] = node->childs[0];
+            rightnode->childs[1] = node->childs[2]->childs[1];
+            rightnode->childs[2] = node->childs[2]->childs[2];
+            
             return res_node;
         }
         // a +- (b +- c) -> (a +- b) +-/-+ c
@@ -186,14 +174,14 @@ static struct node_t *optimize_shuffle_ops(const struct node_t *node, double tim
         {
             struct node_t *res_node = soft_copy(node);
             struct node_t *leftnode = soft_copy(node->childs[2]);
-            struct node_t *leftnodeop = soft_copy(node->childs[2]->childs[1]);
+            struct node_t *resnodeop = soft_copy(node->childs[2]->childs[1]);
 
             leftnode->childs[0] = node->childs[0];
             leftnode->childs[1] = node->childs[1];
             leftnode->childs[2] = node->childs[2]->childs[0];
 
             res_node->childs[0] = leftnode;
-            res_node->childs[1] = leftnodeop;
+            res_node->childs[1] = resnodeop;
             res_node->childs[2] = node->childs[2]->childs[2];
             
 
@@ -201,21 +189,21 @@ static struct node_t *optimize_shuffle_ops(const struct node_t *node, double tim
             if (node->childs[1]->type == NODE_TYPE_OP_SUB || 
                 node->childs[1]->type == NODE_TYPE_OP_DIV)
             {
-                if (leftnodeop->type == NODE_TYPE_OP_ADD)
+                if (resnodeop->type == NODE_TYPE_OP_ADD)
                 {
-                    leftnodeop->type = NODE_TYPE_OP_SUB;
+                    resnodeop->type = NODE_TYPE_OP_SUB;
                 }
-                else if (leftnodeop->type == NODE_TYPE_OP_SUB)
+                else if (resnodeop->type == NODE_TYPE_OP_SUB)
                 {
-                    leftnodeop->type = NODE_TYPE_OP_ADD;
+                    resnodeop->type = NODE_TYPE_OP_ADD;
                 }
-                else if (leftnodeop->type == NODE_TYPE_OP_MUL)
+                else if (resnodeop->type == NODE_TYPE_OP_MUL)
                 {
-                    leftnodeop->type = NODE_TYPE_OP_DIV;
+                    resnodeop->type = NODE_TYPE_OP_DIV;
                 }
-                else if (leftnodeop->type == NODE_TYPE_OP_DIV)
+                else if (resnodeop->type == NODE_TYPE_OP_DIV)
                 {
-                    leftnodeop->type = NODE_TYPE_OP_MUL;
+                    resnodeop->type = NODE_TYPE_OP_MUL;
                 }
             }
             return res_node;
@@ -258,7 +246,7 @@ static struct node_t *optimize_shuffle_ops(const struct node_t *node, double tim
             }
             return res_node;
         }
-        if ((node->childs[1]->type == NODE_TYPE_OP_MUL || node->childs[1]->type == NODE_TYPE_OP_ADD) && rand() % 1000 > 450)
+        if ((node->childs[1]->type == NODE_TYPE_OP_MUL || node->childs[1]->type == NODE_TYPE_OP_ADD) && rand() % 1000 > 250)
         {
             struct node_t *res_node = soft_copy(node);
             res_node->childs[0] = node->childs[2];
@@ -281,11 +269,15 @@ static struct node_t *optimize_neutral_elements(const struct node_t *node, doubl
                 {
                     char *end;
                     double x = strtod(node->childs[0]->start, &end);
-                    if (fabs(x) < 1e-6)
+                    if (is_near(x, 0.0))
                     {
                         return node->childs[0];
                     }
+<<<<<<< HEAD:optimization_rules.c
                     if (fabs(x - 1.0) < 1e-6) // TODO: compare_doubles
+=======
+                    if (is_near(x, 1.0))
+>>>>>>> 956bf2b1063ae0796d10124e9eb9ffa7e77650a0:optimization_rules.cpp
                     {
                         return node->childs[0];
                     }
@@ -294,15 +286,15 @@ static struct node_t *optimize_neutral_elements(const struct node_t *node, doubl
                 {
                     char *end;
                     double x = strtod(node->childs[2]->start, &end);
-                    if (fabs(x - 1.0) < 1e-6)
+                    if (is_near(x, 1.0))
                     {
                         return node->childs[0];
                     }
-                    if (fabs(x) < 1e-6)
+                    if (is_near(x, 0.0))
                     {
                         struct node_t *res_node = soft_copy(node);
                         res_node->start = strdup("1");
-                        res_node->end = node->childs[2]->start + 1;
+                        res_node->end = res_node->start + 1;
                         res_node->type = NODE_TYPE_FLOAT;
                         return res_node;
                     }
@@ -318,7 +310,7 @@ static struct node_t *optimize_neutral_elements(const struct node_t *node, doubl
                     {
                         char *end;
                         double x = strtod(node->childs[0]->start, &end);
-                        if (fabs(x) < 1e-6)
+                        if (is_near(x, 0.0))
                         {
                             return node->childs[2];
                         }
@@ -327,7 +319,7 @@ static struct node_t *optimize_neutral_elements(const struct node_t *node, doubl
                     {
                         char *end;
                         double x = strtod(node->childs[2]->start, &end);
-                        if (fabs(x) < 1e-6)
+                        if (is_near(x, 0.0))
                         {
                             return node->childs[0];
                         }
@@ -340,7 +332,7 @@ static struct node_t *optimize_neutral_elements(const struct node_t *node, doubl
                     {
                         char *end;
                         double x = strtod(node->childs[0]->start, &end);
-                        if (fabs(x) < 1e-6)
+                        if (is_near(x, 0.0))
                         {
                             struct node_t *res_node = new_node_ex(NODE_TYPE_OP_PREFIX, NULL, NULL);
                             struct node_t *sign_node = new_node_ex(NODE_TYPE_OP_SUB, NULL, NULL);
@@ -355,7 +347,7 @@ static struct node_t *optimize_neutral_elements(const struct node_t *node, doubl
                     {
                         char *end;
                         double x = strtod(node->childs[2]->start, &end);
-                        if (fabs(x) < 1e-6)
+                        if (is_near(x, 0.0))
                         {
                             return node->childs[0];
                         }
@@ -372,11 +364,11 @@ static struct node_t *optimize_neutral_elements(const struct node_t *node, doubl
                     {
                         char *end;
                         double x = strtod(node->childs[0]->start, &end);
-                        if (fabs(x) < 1e-6)
+                        if (is_near(x, 0.0))
                         {
                             return node->childs[0];
                         }
-                        if (fabs(x - 1.0) < 1e-6)
+                        if (is_near(x, 1.0))
                         {
                             return node->childs[2];
                         }
@@ -385,11 +377,11 @@ static struct node_t *optimize_neutral_elements(const struct node_t *node, doubl
                     {
                         char *end;
                         double x = strtod(node->childs[2]->start, &end);
-                        if (fabs(x) < 1e-6)
+                        if (is_near(x, 0.0))
                         {
                             return node->childs[2];
                         }
-                        if (fabs(x - 1.0) < 1e-6)
+                        if (is_near(x, 1.0))
                         {
                             return node->childs[0];
                         }
@@ -402,11 +394,11 @@ static struct node_t *optimize_neutral_elements(const struct node_t *node, doubl
                     {
                         char *end;
                         double x = strtod(node->childs[0]->start, &end);
-                        if (fabs(x) < 1e-6)
+                        if (is_near(x, 0.0))
                         {
                             return node->childs[0];
                         }
-                        if (fabs(x - 1.0) < 1e-6 && rand() % 3 == 0)
+                        if (is_near(x, 1.0) && rand() % 3 == 0)
                         {
                             struct node_t *res_node = new_node_ex(NODE_TYPE_POW, NULL, NULL);
                             struct node_t *sign_node = new_node_ex(NODE_TYPE_OP_POW, NULL, NULL);
@@ -426,11 +418,11 @@ static struct node_t *optimize_neutral_elements(const struct node_t *node, doubl
                     {
                         char *end;
                         double x = strtod(node->childs[2]->start, &end);
-                        if (fabs(x) < 1e-6)
+                        if (is_near(x, 0.0))
                         {
                             return node->childs[2];
                         }
-                        if (fabs(x - 1.0) < 1e-6)
+                        if (is_near(x, 1.0))
                         {
                             return node->childs[0];
                         }
@@ -569,7 +561,7 @@ struct node_t *optimize_simple_sums(const struct node_t *node, double time)
                 
                 struct node_t *node_add = new_node();
                 node_add->type = NODE_TYPE_ADDSUB;
-                node_add->start = node_add->start = strdup("");
+                node_add->end = node_add->start = strdup("");
                 
                 struct node_t *node2 = new_node();
                 node2->type = NODE_TYPE_FLOAT;
@@ -660,6 +652,11 @@ struct node_t *optimize_simple_muls(const struct node_t *node, double time)
             struct node_t *addnode = new_node_ex(NODE_TYPE_ADDSUB, NULL, NULL);
             struct node_t *addop = new_node_ex(NODE_TYPE_OP_ADD, NULL, NULL);
 
+            if (node->childs[1]->type == NODE_TYPE_OP_DIV)
+            {
+                addop->type = NODE_TYPE_OP_SUB;
+            }
+
             add_child(addnode, node->childs[0]->childs[2]);
             add_child(addnode, addop);
             add_child(addnode, node->childs[2]->childs[2]);
@@ -737,18 +734,18 @@ struct node_t *optimize_simple_pows(const struct node_t *node, double time)
             char *e;
             double pow = strtod(node->childs[2]->start, &e);
 
-            if (fabs(pow) < 1e-6)
+            if (is_near(pow, 0.0))
             {
                 char *s = strdup("1");
                 struct node_t *fltnode = new_node_ex(NODE_TYPE_FLOAT, s, s + 1);
                 
                 return fltnode;
             }
-            if (fabs(pow - 1.0) < 1e-6)
+            if (is_near(pow, 1.0))
             {
                 return node->childs[0];
             }
-            if (fabs(pow + 1.0) < 1e-6)
+            if (is_near(pow, -1.0))
             {
                 /* 1/x */
                 struct node_t *mulnode = new_node_ex(NODE_TYPE_MULDIV, "", "");
@@ -845,6 +842,76 @@ struct node_t *deoptimize_mul(const struct node_t *node, double time)
             add_child(res_node, mul2);
 
             return res_node;
+        }
+    }
+
+    if (node->type == NODE_TYPE_MULDIV && node->childs[1]->type == NODE_TYPE_OP_MUL &&
+        rand() % 1000 < 200)
+    {
+        /* n * x = (n - a) * x + a * x */
+        if (node->childs[0]->type == NODE_TYPE_FLOAT || node->childs[2]->type == NODE_TYPE_FLOAT)
+        {
+            int64_t coeff_id = 0;
+            if (node->childs[0]->type == NODE_TYPE_FLOAT)
+            {
+                coeff_id = 0;
+            }
+            else
+            {
+                coeff_id = 2;
+            }
+            char *e;
+            double x = strtod(node->childs[coeff_id]->start, &e);
+            if (is_near(round(x) - x, 0.0))
+            {
+                int64_t ix = x, a = 0;
+                if (ix > 0)
+                {
+                    a = rand() % ix;
+                }
+                else if (ix < 0)
+                {
+                    a = -(rand() % (-ix));
+                }
+                if (ix != 0)
+                {
+                    int64_t len;
+                    char *s1, *s1e, *s2, *s2e, buf[64];
+                    len = sprintf(buf, "%lld", ix - a);
+                    s1 = strdup(buf); s1e = s1 + len;
+                    struct node_t *res_node = new_node_ex(NODE_TYPE_ADDSUB, NULL, NULL);
+                    struct node_t *addop = new_node_ex(NODE_TYPE_OP_ADD, NULL, NULL);
+                    struct node_t *num1 = new_node_ex(NODE_TYPE_FLOAT, s1, s1e);
+                    struct node_t *node_copy = soft_copy(node);
+
+                    struct node_t *other_node = NULL;
+                    if (a == 1)
+                    {
+                        other_node = node->childs[2 - coeff_id];
+                    }
+                    else
+                    {
+                        len = sprintf(buf, "%lld", a);
+                        s2 = strdup(buf); s2e = s2 + len;
+                        struct node_t *num2 = new_node_ex(NODE_TYPE_FLOAT, s2, s2e);
+                        struct node_t *mulop = new_node_ex(NODE_TYPE_OP_MUL, NULL, NULL);
+                        
+                        other_node = new_node_ex(NODE_TYPE_MULDIV, NULL, NULL);
+                        
+                        add_child(other_node, num2);
+                        add_child(other_node, mulop);
+                        add_child(other_node, node->childs[2 - coeff_id]);
+                    }
+
+                    node_copy->childs[coeff_id] = num1;
+
+                    add_child(res_node, node_copy);
+                    add_child(res_node, addop);
+                    add_child(res_node, other_node);
+                    
+                    return res_node;
+                }
+            }
         }
     }
     
